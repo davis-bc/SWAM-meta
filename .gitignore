@@ -1,0 +1,7 @@
+input/**
+output/**
+slurm/**
+dbs/**
+.snakemake/**
+.snakemake
+run_snakemake.sh

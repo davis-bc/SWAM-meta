@@ -1,0 +1,31 @@
+# Main entrypoint of the workflow.
+# Pipeline made to follow best practices:
+# https://snakemake.readthedocs.io/en/stable/snakefiles/best_practices.html,
+# in particular regarding the standardized folder structure mentioned there.
+
+
+# ------------------------
+#   Load configuration
+# ------------------------
+
+configfile: "config/config.yaml"
+
+# ---------------
+#   Load rules
+# ---------------
+
+include: "rules/common.smk"
+include: "rules/short_reads.smk"
+
+localrules: index_panres
+
+# ------------------------------------------
+#   Define the target outputs for pipeline
+# ------------------------------------------
+
+rule all:
+    input:
+        expand(os.path.join(output_dir, "data", "clean_reads", "{sample}_merged.clean.fastq.gz"), sample=samples),
+        expand(os.path.join(output_dir, "data", "QAQC", "MicrobeCensus", "{sample}.txt"), sample=samples),
+        expand(os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.nonpareil"), sample=samples),
+        expand(os.path.join(output_dir, "data", "panres", "{sample}.panres"), sample=samples)
