@@ -6,5 +6,5 @@ dependencies:
   - fastp
   - kma
   - nonpareil
-  - microbecensus
+  - diamond
   - minimap2

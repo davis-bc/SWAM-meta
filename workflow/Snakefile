@@ -17,7 +17,7 @@ configfile: "config/config.yaml"
 include: "rules/common.smk"
 include: "rules/short_reads.smk"
 
-localrules: index_panres
+localrules: initiate_dbs, short_reads_summary
 
 # ------------------------------------------
 #   Define the target outputs for pipeline
@@ -25,7 +25,5 @@ localrules: index_panres
 
 rule all:
     input:
-        expand(os.path.join(output_dir, "data", "clean_reads", "{sample}_merged.clean.fastq.gz"), sample=samples),
-        expand(os.path.join(output_dir, "data", "QAQC", "MicrobeCensus", "{sample}.txt"), sample=samples),
-        expand(os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.nonpareil"), sample=samples),
-        expand(os.path.join(output_dir, "data", "panres", "{sample}.panres"), sample=samples)
+        fastp   = os.path.join(output_dir, "fastp_summary.csv"),
+        panres  = os.path.join(output_dir, "panres.csv")
