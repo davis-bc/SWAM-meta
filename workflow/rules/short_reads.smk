@@ -62,7 +62,7 @@ rule short_reads:
         
         # Run diamond against single-copy genes for cell normalization
         mkdir -p $(dirname {output.scgs})
-        diamond blastx --db $(dirname {input.scg_db})/scg_db --query {output.clean} --out {output.scgs} --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore slen --mid-sensitive --max-target-seqs 1 --threads {resources.threads} --quiet 
+        diamond blastx --db $(dirname {input.scg_db})/scg_db --query {output.clean} --out {output.scgs} --outfmt 6 qseqid sseqid pident length evalue bitscore slen --mid-sensitive --max-target-seqs 1 --threads {resources.threads} --quiet 
         
         # run nonpareil to calcualte metagenomic coverage
         mkdir -p $(dirname {output.nonpareil})

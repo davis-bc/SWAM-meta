@@ -19,6 +19,14 @@ jsons         <- snakemake@input[["jsons"]]
 out_file1 <- snakemake@output[[1]]
 out_file2 <- snakemake@output[[2]]
 
+
+###############################################
+###      summarize metagenomic coverage data
+###############################################
+
+nps <- as.data.frame(summary(Nonpareil.set(npos)))
+nps <- nps %>% rownames_to_column(var="sample")
+
 #####################################################
 ###    generate summary table from fastp json files
 #####################################################
@@ -163,17 +171,24 @@ summarize_fastp <- function(json_path) {
 }
 
 fastp_summary <- purrr::map_dfr(jsons, summarize_fastp)
+fastp_summary <- fastp_summary %>% mutate(avg_read_length = (avg_merged_len * pct_reads_merged) + (read1_len_before * (1-pct_reads_merged)))
 
-###############################################
-###      summarize metagenomic coverage data
-###############################################
+fastp_summary <- fastp_summary %>% left_join(nps, by="sample") %>%
+                 rename(meta_coverage=C, seq_div=diversity) %>% 
+                 select(sample, meta_coverage, seq_div, 
+                        total_reads_before, total_reads_after, 
+                        total_bases_before, total_bases_after,
+                        q30_before, q30_after, 
+                        read1_len_before, read2_len_before,
+                        merged_reads, merged_bases, avg_merged_len, 
+                        pct_reads_merged, avg_read_length)
 
 
-###############################################
-###      read in alignment files, normalize
-###############################################
+####################################################
+###      read in alignment files, normalize to cpg
+####################################################
 
-outfmt6 <- c("qseqid", "sseqid", "pident", "length", "mismatch", "gapopen", "qstart", "qend", "sstart", "send", "evalue", "bitscore", "slen")
+outfmt <- c("qseqid", "sseqid", "pident", "length", "evalue", "bitscore", "slen")
 
 panres <- do.call(bind_rows, lapply(panres_files, function(f) {
   x <- tryCatch(read_tsv(f, col_types = cols()),
@@ -189,19 +204,41 @@ scg <- do.call(bind_rows, lapply(scgs, function(f) {
   x <- tryCatch(read.table(f),
                 error=function(e) NULL)
   if (is.null(x)) return(NULL)
-  colnames(x) <- outfmt6
+  colnames(x) <- outfmt
   x$sample <- sub(".scgs", "", basename(f))
   x <- x %>% relocate(sample)
   x
 }))
+
+# estimate genome counts as average coverage depth of 40 SCGs
+genome.counts <- scg %>% 
+                group_by(sample) %>% 
+                distinct(qseqid, .keep_all = T) %>% 
+                summarise(n_genomes = sum(length/slen)/40)
+
+# estimate copies per genome (cpg) as gene coverage depth / estimated genome counts
+panres_long <-  panres %>% 
+                left_join(genome.counts, by="sample") %>% 
+                left_join(fastp_summary %>% select(sample, avg_read_length), by="sample") %>%
+                mutate(read_count = round(Depth * Template_length / avg_read_length),
+                       cpg = Depth / n_genomes) %>%
+                filter(read_count >= 1) %>% 
+                select(sample, `#Template`, read_count, Depth, cpg) %>% 
+                rename(PanRes_accession=`#Template`) %>%
+                left_join(panres_metadata, by="PanRes_accession") %>%
+                select(-shortname, -fa_name, -X, -fa_descript, -chosenSeq)
+
+panres_long <- panres_long %>% 
+                filter(!grepl("RequiresSNPConfirmation", fa_header), 
+                        !class == "csabapal", !gene_symbol == "rpoB2")
 
 
 ###############################################
 ###       write csv outputs
 ###############################################
 
-write.csv(fastp_summary, out_file1)
-write.csv(panres, out_file2)
+write.csv(fastp_summary, out_file1, row.names=F)
+write.csv(panres_long, out_file2, row.names=F)
 
 
 
