@@ -5,3 +5,4 @@ dbs/**
 .snakemake/**
 .snakemake
 run_snakemake.sh
+short_reads_processing_test.R
