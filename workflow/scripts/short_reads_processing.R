@@ -9,10 +9,11 @@ invisible(lapply(libraries, function(x) {
   
 # Input files
 
-panres_files  <- snakemake@input[["panres_files"]]
-scgs          <- snakemake@input[["scgs"]]
-npos          <- snakemake@input[["npos"]]
-jsons         <- snakemake@input[["jsons"]]
+afp_files       <- snakemake@input[["afp_files"]]
+scgs            <- snakemake@input[["scgs"]]
+npos            <- snakemake@input[["npos"]]
+jsons           <- snakemake@input[["jsons"]]
+afp_path        <- snakemake@input[["afp_metadata"]]
 
 # Output files
 
@@ -171,7 +172,10 @@ summarize_fastp <- function(json_path) {
 }
 
 fastp_summary <- purrr::map_dfr(jsons, summarize_fastp)
-fastp_summary <- fastp_summary %>% mutate(avg_read_length = (avg_merged_len * pct_reads_merged) + (read1_len_before * (1-pct_reads_merged)))
+fastp_summary <- fastp_summary %>% 
+                 mutate(avg_read_length = (avg_merged_len * pct_reads_merged / 100) + 
+                                          (read1_len_before * (1 - (pct_reads_merged / 100)))
+                                          )
 
 fastp_summary <- fastp_summary %>% left_join(nps, by="sample") %>%
                  rename(meta_coverage=C, seq_div=diversity) %>% 
@@ -188,14 +192,21 @@ fastp_summary <- fastp_summary %>% left_join(nps, by="sample") %>%
 ###      read in alignment files, normalize to cpg
 ####################################################
 
-outfmt <- c("qseqid", "sseqid", "pident", "length", "evalue", "bitscore", "slen")
+afp_metadata <- read_tsv(afp_path, show_col_types = FALSE)
 
-panres <- do.call(bind_rows, lapply(panres_files, function(f) {
+catalog_long <- afp_metadata %>% 
+                      pivot_longer(cols = c("refseq_nucleotide_accession", "genbank_nucleotide_accession"), values_to = "key") %>%
+                      distinct(key, .keep_all = TRUE)
+
+afp <- do.call(bind_rows, lapply(afp_files, function(f) {
   x <- tryCatch(read_tsv(f, col_types = cols()),
                 error=function(e) NULL)
   if (is.null(x)) return(NULL)
-  x$sample <- sub(".panres.res", "", basename(f))
+  x$sample <- sub(".afp.res", "", basename(f))
   x <- x %>% relocate(sample)
+  x <- x %>% separate(`#Template`, into=c("GI", "refseq_protein_accession", "refseq_nucleotide_accession",
+                      "fg1", "fg2", "node_id", "parent_node_id", "res_mech_type"), sep="\\|")
+  x <- x %>% separate(res_mech_type, into=c("res_mech_type", "protein_name"), sep=" ")
   x
 }))
 
@@ -204,7 +215,7 @@ scg <- do.call(bind_rows, lapply(scgs, function(f) {
   x <- tryCatch(read.table(f),
                 error=function(e) NULL)
   if (is.null(x)) return(NULL)
-  colnames(x) <- outfmt
+  colnames(x) <- c("qseqid", "sseqid", "pident", "length", "evalue", "bitscore", "slen")
   x$sample <- sub(".scgs", "", basename(f))
   x <- x %>% relocate(sample)
   x
@@ -217,20 +228,16 @@ genome.counts <- scg %>%
                 summarise(n_genomes = sum(length/slen)/40)
 
 # estimate copies per genome (cpg) as gene coverage depth / estimated genome counts
-panres_long <-  panres %>% 
-                left_join(genome.counts, by="sample") %>% 
-                left_join(fastp_summary %>% select(sample, avg_read_length), by="sample") %>%
-                mutate(read_count = round(Depth * Template_length / avg_read_length),
-                       cpg = Depth / n_genomes) %>%
-                filter(read_count >= 1) %>% 
-                select(sample, `#Template`, read_count, Depth, cpg) %>% 
-                rename(PanRes_accession=`#Template`) %>%
-                left_join(panres_metadata, by="PanRes_accession") %>%
-                select(-shortname, -fa_name, -X, -fa_descript, -chosenSeq)
-
-panres_long <- panres_long %>% 
-                filter(!grepl("RequiresSNPConfirmation", fa_header), 
-                        !class == "csabapal", !gene_symbol == "rpoB2")
+afp_long <-  afp %>% 
+                  left_join(genome.counts, by="sample") %>% 
+                  left_join(fastp_summary %>% select(sample, avg_read_length), by="sample") %>%
+                  mutate(read_count = round(Depth * Template_length / avg_read_length),
+                         cpg = Depth / n_genomes) %>%
+                  filter(read_count >= 1) %>% 
+                  left_join(catalog_long, by=c("refseq_nucleotide_accession" = "key")) %>%
+                  mutate(allele_pass = ifelse(Template_Identity >= 80 & Query_Identity >= 99 & !is.na(allele), "yes", "no")) %>%
+                  select(sample, read_count, Depth, cpg, allele, allele_pass, gene_family, product_name, 
+                         scope, type, subtype, class, subclass, refseq_nucleotide_accession) 
 
 
 ###############################################
@@ -238,7 +245,7 @@ panres_long <- panres_long %>%
 ###############################################
 
 write.csv(fastp_summary, out_file1, row.names=F)
-write.csv(panres_long, out_file2, row.names=F)
+write.csv(afp_long, out_file2, row.names=F)
 
 
 

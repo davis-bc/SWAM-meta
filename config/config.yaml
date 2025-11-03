@@ -1,3 +1,1 @@
-panres_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/PanRes_genes_v1.0.0.fasta"
-panres_metadata: "/work/NRSAAMR/Projects/SWAM/meta/dbs/panres_v1.0.0_metadata.csv"
 scg_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/SCGs_40_All.fasta"

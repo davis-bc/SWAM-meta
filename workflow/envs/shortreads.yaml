@@ -8,3 +8,5 @@ dependencies:
   - nonpareil
   - diamond
   - minimap2
+  - samtools
+  - pigz

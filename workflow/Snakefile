@@ -3,6 +3,10 @@
 # https://snakemake.readthedocs.io/en/stable/snakefiles/best_practices.html,
 # in particular regarding the standardized folder structure mentioned there.
 
+import os
+from snakemake.shell import shell
+shell.executable("/bin/bash")
+
 
 # ------------------------
 #   Load configuration
@@ -26,4 +30,4 @@ localrules: initiate_dbs, short_reads_summary
 rule all:
     input:
         fastp   = os.path.join(output_dir, "fastp_summary.csv"),
-        panres  = os.path.join(output_dir, "panres.csv")
+        panres  = os.path.join(output_dir, "short_reads_output.csv")
