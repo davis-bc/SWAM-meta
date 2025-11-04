@@ -4,8 +4,9 @@
 
 rule initiate_dbs:
     output:
-        afp_db   = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
-        scg_db   = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt")
+        afp_db       = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
+        scg_db       = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt"),
+        afp_metadata = os.path.join(output_dir, "data", "alignments", "dbs", "ReferenceGeneCatalog.txt")
     params:
         scg_db=config["scg_db"]
     conda: "../envs/shortreads.yaml"

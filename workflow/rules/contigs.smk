@@ -43,52 +43,24 @@ rule contigs:
         set -euo pipefail
         echo "assembling with megahit"
 
-        final_contigs="{output.megahit}"
-        megahit_dir="$(dirname "$final_contigs")"     
-        parent="$(dirname "$megahit_dir")"            
-
-        # ensure directories exist
-        mkdir -p "$megahit_dir"
-        mkdir -p "$parent"
-
         # create temporary directory in same parent so moves are on same fs (atomic)
-        tmpdir="$(mktemp -d "${parent}/.megahit_{wildcards.sample}.tmp.XXXXXX")"
-
-        cleanup() {
-            if [ -n "${tmpdir:-}" ] && [ -d "$tmpdir" ]; then
-                rm -rf "$tmpdir"
-            fi
-        }
-        trap cleanup EXIT
+        tmpdir="$(mktemp -d "$(dirname {output.megahit})/.megahit_{wildcards.sample}.tmp.XXXXXX")"
 
         # Run MEGAHIT into the temporary directory
-        megahit --12 "{input.reads}" \
+        megahit --12 {input.reads} \
             -t {resources.threads} \
             --presets meta-large \
             --min-contig-len 1000 \
             -o "$tmpdir" \
-            --out-prefix "{wildcards.sample}" \
+            --out-prefix {wildcards.sample} \
             --continue
-
-        # expected contigs file inside tmpdir
-        tmp_contigs="$tmpdir/{wildcards.sample}.contigs.fa"
-        if [ ! -f "$tmp_contigs" ]; then
-            echo "ERROR: expected contigs file not found: $tmp_contigs" >&2
-            exit 1
-        fi
 
         # Move the contigs file into the final megahit directory.
         # Overwrite if exists (protected() in Snakemake prevents accidental deletion by Snakemake, but we still overwrite intentionally).
-        mv -f "$tmp_contigs" "$final_contigs"
+        mv -f "$tmpdir/{wildcards.sample}.contigs.fa" {output.megahit}
 
         # Clean up the rest of temporary files
         rm -rf "$tmpdir"
-
-        # prevent trap from deleting already-removed tmpdir
-        unset tmpdir
-        trap - EXIT
-
-        echo "megahit assembly complete: $final_contigs"
 
         """
     
