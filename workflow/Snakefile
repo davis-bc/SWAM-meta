@@ -20,8 +20,9 @@ configfile: "config/config.yaml"
 
 include: "rules/common.smk"
 include: "rules/short_reads.smk"
+include: "rules/contigs.smk"
 
-localrules: initiate_dbs, short_reads_summary
+localrules: initiate_dbs, short_reads_summary, init_genomad
 
 # ------------------------------------------
 #   Define the target outputs for pipeline
@@ -29,5 +30,7 @@ localrules: initiate_dbs, short_reads_summary
 
 rule all:
     input:
-        fastp   = os.path.join(output_dir, "fastp_summary.csv"),
-        panres  = os.path.join(output_dir, "short_reads_output.csv")
+        fastp        = os.path.join(output_dir, "fastp_summary.csv"),
+        short_reads  = os.path.join(output_dir, "short_reads_output.csv"),
+        contigs      = expand(os.path.join(output_dir, "data", "megahit", "{sample}", "{sample}.contigs.fa"), sample=samples),
+        genomad      = expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples)

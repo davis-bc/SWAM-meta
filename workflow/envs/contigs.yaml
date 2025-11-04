@@ -7,6 +7,5 @@ dependencies:
   - kma
   - blast
   - minimap2
-  - genomad
   - mmseqs2
   - prodigal

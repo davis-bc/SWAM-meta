@@ -12,7 +12,6 @@ rule initiate_dbs:
     shell:
         """
         # download latest AMRFinderPlus database and metadata
-        mkdir -p $(dirname {output.afp_db})
         echo "downloading latest AMRFinderPlus database and metadata"
         wget -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa > /dev/null 2>&1
         wget -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt > /dev/null 2>&1
@@ -39,9 +38,9 @@ rule initiate_dbs:
 
 rule short_reads:
     input:
-        r1 = get_r1,
-        r2 = get_r2,
-        afp_db = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
+        r1      = get_r1,
+        r2      = get_r2,
+        afp_db  = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
         scg_db  = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt")
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
