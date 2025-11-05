@@ -12,6 +12,7 @@ rule initiate_dbs:
     conda: "../envs/shortreads.yaml"
     shell:
         """
+        
         # download latest AMRFinderPlus database and metadata
         echo "downloading latest AMRFinderPlus database and metadata"
         wget -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa > /dev/null 2>&1
@@ -39,10 +40,10 @@ rule initiate_dbs:
 
 rule short_reads:
     input:
-        r1      = get_r1,
-        r2      = get_r2,
-        afp_db  = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
-        scg_db  = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt")
+        r1          = get_r1,
+        r2          = get_r2,
+        afp_db      = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
+        scg_db      = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt")
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
         clean       = protected(os.path.join(output_dir, "data", "clean_reads", "{sample}_merged.clean.fastq.gz")),
@@ -54,7 +55,7 @@ rule short_reads:
         threads = 16,
         time = "0-10:00:00"
     benchmark:
-        os.path.join(output_dir, "data", "benchmarks", "{sample}.short_reads.txt")
+        os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.short_reads.txt")
     conda: "../envs/shortreads.yaml"
     shell:
         """
@@ -63,14 +64,30 @@ rule short_reads:
         
         # run fastp
         echo "cleaning and merging reads with fastp"
+        
         TMP_MERGED="$TMPDIR/{wildcards.sample}_merged.fastq.gz"
+        # ensure the temporary file is removed on any exit
+        trap 'rm -f "$TMP_MERGED"' EXIT
+        
         fastp -i {input.r1} -I {input.r2} --merge --include_unmerged --merged_out "$TMP_MERGED" --html /dev/null/ --json {output.json}
 
         # remove human dna
-        echo "filtering out human DNA"
-        minimap2 -t {resources.threads} -ax sr $(dirname {input.afp_db})/GCF_000001405.40_GRCh38.p14_genomic.fna.gz "$TMP_MERGED" | samtools fastq -n -f 4 - | pigz -p {resources.threads} > {output.clean}
+        echo "filtering out human DNA and ensuring an even number of reads in the final clean file"
+        # Stream minimap2 -> samtools, then use an awk streaming filter that prints only complete pairs
+        # of FASTQ records (8 lines). This implementation groups lines by NR%8 so it stays streaming and
+        # drops any final incomplete 8-line block (i.e., a trailing single FASTQ record).
         
-        rm "$TMP_MERGED"
+        minimap2 -t {resources.threads} -ax sr $(dirname {input.afp_db})/GCF_000001405.40_GRCh38.p14_genomic.fna.gz "$TMP_MERGED" \
+            | samtools fastq -n -f 4 - \
+            | awk '{{ 
+                # buffer 8-line blocks; NR is line count across the stream
+                buf_index = (NR-1) % 8 + 1
+                buf[buf_index] = $0
+                if (NR % 8 == 0) {{
+                    for (i = 1; i <= 8; i++) print buf[i]
+                }}
+              }}' \
+            | pigz -p {resources.threads} > {output.clean}
         
         # run KMA against AMRFinderPlus
         echo "aligning reads to AMRFinderPlus"
@@ -86,6 +103,7 @@ rule short_reads:
         gunzip -c {input.r1} > $(dirname {output.nonpareil})/$base
         nonpareil -s $(dirname {output.nonpareil})/$base -T kmer -f fastq -b $(dirname {output.nonpareil})/{wildcards.sample}
         rm $(dirname {output.nonpareil})/$base
+        
         """
         
 # ------------------------------------------

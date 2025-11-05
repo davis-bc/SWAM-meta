@@ -10,9 +10,8 @@ rule init_genomad:
         """
         if [ ! -d $(dirname {output.genomad_db})/genomad_db ]; then
         
-        echo "Preparing geNomad database"
         cd $(dirname {output.genomad_db})
-        genomad download-database . > /dev/null 2>&1
+        genomad download-database .
         touch {output.genomad_db}
         
         else 
@@ -40,6 +39,7 @@ rule contigs:
     conda: "../envs/contigs.yaml"
     shell:
         """
+        
         set -euo pipefail
         echo "assembling with megahit"
 
@@ -53,7 +53,8 @@ rule contigs:
             --min-contig-len 1000 \
             -o "$tmpdir" \
             --out-prefix {wildcards.sample} \
-            --continue
+            --continue \
+            -f 
 
         # Move the contigs file into the final megahit directory.
         # Overwrite if exists (protected() in Snakemake prevents accidental deletion by Snakemake, but we still overwrite intentionally).
@@ -71,7 +72,7 @@ rule contigs:
 rule genomad:
     input:
         contigs     = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        genomd_db   = os.path.join(output_dir, "data", "genomad", ".genomad.db.done.txt")
+        genomad_db   = os.path.join(output_dir, "data", "genomad", ".genomad.db.done.txt")
     output:
         genomad     = directory(os.path.join(output_dir, "data", "genomad", "{sample}"))
     resources:
@@ -86,7 +87,7 @@ rule genomad:
         
         # classify contigs into chromosome/phage/plasmid
         echo "running geNomad"
-        genomad end-to-end {output.megahit} {output.genomad} $(dirname {input.genomad_db})/genomad_db --relaxed --cleanup
+        genomad end-to-end {input.contigs} {output.genomad} $(dirname {input.genomad_db})/genomad_db --relaxed --cleanup
         
         """
         
