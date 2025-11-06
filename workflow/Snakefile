@@ -35,4 +35,5 @@ rule all:
         fastp        = os.path.join(output_dir, "fastp_summary.csv"),
         short_reads  = os.path.join(output_dir, "short_reads_output.csv"),
         contigs      = expand(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"), sample=samples),
-        genomad      = expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples)
+        genomad      = expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples),
+        mobmess      = expand(os.path.join(output_dir, "data", "mobmess", "{sample}"), sample=samples)

@@ -9,3 +9,17 @@ dependencies:
   - minimap2
   - mmseqs2
   - prodigal
+  - numpy 
+  - pandas 
+  - scipy 
+  - scikit-learn 
+  - igraph 
+  - pysam
+  - numba 
+  - python-blosc 
+  - mummer4
+  - pip
+  - pip:
+      - git+https://github.com/michaelkyu/PlasX.git
+      - git+https://github.com/michaelkyu/MobMess.git
+        

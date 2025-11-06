@@ -6,7 +6,8 @@ rule initiate_dbs:
     output:
         afp_db       = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
         scg_db       = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt"),
-        afp_metadata = os.path.join(output_dir, "data", "alignments", "dbs", "ReferenceGeneCatalog.txt")
+        afp_metadata = os.path.join(output_dir, "data", "alignments", "dbs", "ReferenceGeneCatalog.txt"),
+        h_genome     = os.path.join(output_dir, "data", "alignments", "dbs", "GCF_000001405.40_GRCh38.p14_genomic.fna.gz")
     params:
         scg_db=config["scg_db"]
     conda: "../envs/shortreads.yaml"
@@ -43,10 +44,12 @@ rule short_reads:
         r1          = get_r1,
         r2          = get_r2,
         afp_db      = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
-        scg_db      = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt")
+        scg_db      = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt"),
+        h_genome    = os.path.join(output_dir, "data", "alignments", "dbs", "GCF_000001405.40_GRCh38.p14_genomic.fna.gz")
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
-        clean       = protected(os.path.join(output_dir, "data", "clean_reads", "{sample}_merged.clean.fastq.gz")),
+        r1_clean    = protected(os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz")),
+        r2_clean    = protected(os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz")),
         nonpareil   = protected(os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.npo")),
         afp         = os.path.join(output_dir, "data", "alignments", "{sample}.afp.res"),
         scgs        = os.path.join(output_dir, "data", "alignments", "{sample}.scgs")
@@ -60,47 +63,39 @@ rule short_reads:
     shell:
         """
         set -euo pipefail
-        export TMPDIR="$(dirname {output.clean})"
+        export TMPDIR="$(dirname {output.r1_clean})"
         
-        # run fastp
-        echo "cleaning and merging reads with fastp"
+        TMP_R1="$TMPDIR/{wildcards.sample}_R1.fastq.gz"
+        TMP_R2="$TMPDIR/{wildcards.sample}_R2.fastq.gz"
         
-        TMP_MERGED="$TMPDIR/{wildcards.sample}_merged.fastq.gz"
-        # ensure the temporary file is removed on any exit
-        trap 'rm -f "$TMP_MERGED"' EXIT
+        # ensure the temporary files are removed on any exit
+        trap 'rm -f "$TMP_R1" "$TMP_R2"' EXIT
         
-        fastp -i {input.r1} -I {input.r2} --merge --include_unmerged --merged_out "$TMP_MERGED" --html /dev/null/ --json {output.json}
+        # run fastp using temporary files
+        echo "cleaning reads with fastp"
+        
+        fastp -i {input.r1} -I {input.r2} -o "$TMP_R1" -O "$TMP_R2" --html /dev/null/ --json {output.json}
 
-        # remove human dna
-        echo "filtering out human DNA and ensuring an even number of reads in the final clean file"
-        # Stream minimap2 -> samtools, then use an awk streaming filter that prints only complete pairs
-        # of FASTQ records (8 lines). This implementation groups lines by NR%8 so it stays streaming and
-        # drops any final incomplete 8-line block (i.e., a trailing single FASTQ record).
+        # filter out human reads, ensure final output has equal number of reads
+        echo "filtering out human DNA"
         
-        minimap2 -t {resources.threads} -ax sr $(dirname {input.afp_db})/GCF_000001405.40_GRCh38.p14_genomic.fna.gz "$TMP_MERGED" \
-            | samtools fastq -n -f 4 - \
-            | awk '{{ 
-                # buffer 8-line blocks; NR is line count across the stream
-                buf_index = (NR-1) % 8 + 1
-                buf[buf_index] = $0
-                if (NR % 8 == 0) {{
-                    for (i = 1; i <= 8; i++) print buf[i]
-                }}
-              }}' \
-            | pigz -p {resources.threads} > {output.clean}
+        minimap2 -t {resources.threads} -ax sr {input.h_genome} "$TMP_R1" "$TMP_R2" | samtools view -u -f 12 -F 256 - \
+        | samtools fastq -n -1 >(pigz -p {resources.threads} > {output.r1_clean}) \
+                 -2 >(pigz -p {resources.threads} > {output.r2_clean}) \
+                 -0 /dev/null -
         
         # run KMA against AMRFinderPlus
-        echo "aligning reads to AMRFinderPlus"
-        kma -i {output.clean} -o $(dirname {output.afp})/{wildcards.sample}.afp -t_db $(dirname {input.afp_db})/afp_db -1t1 -t {resources.threads}
+        echo "aligning reads to AMRFinderPlus with KMA"
+        kma -ipe {output.r1_clean} {output.r2_clean} -o $(dirname {output.afp})/{wildcards.sample}.afp -t_db $(dirname {input.afp_db})/afp_db -1t1 -t {resources.threads}
         
         # Run diamond against single-copy genes for cell normalization
-        echo "aligning reads to single copy genes"
-        diamond blastx --db $(dirname {input.scg_db})/scg_db --query {output.clean} --out {output.scgs} --outfmt 6 qseqid sseqid pident length evalue bitscore slen --fast --max-target-seqs 1 --threads {resources.threads} --quiet
+        echo "aligning reads to single copy genes with diamond"
+        diamond blastx --db $(dirname {input.scg_db})/scg_db --query {output.r1_clean} {output.r2_clean} --out {output.scgs} --outfmt 6 qseqid sseqid pident length evalue bitscore slen --fast --max-target-seqs 1 --threads {resources.threads} --quiet
         
         # run nonpareil to calcualte metagenomic coverage
         echo "estimating metagenomic coverage with nonpareil"
-        base=$(basename {input.r1} .gz)
-        gunzip -c {input.r1} > $(dirname {output.nonpareil})/$base
+        base=$(basename {output.r1_clean} .gz)
+        gunzip -c {output.r1_clean} > $(dirname {output.nonpareil})/$base
         nonpareil -s $(dirname {output.nonpareil})/$base -T kmer -f fastq -b $(dirname {output.nonpareil})/{wildcards.sample}
         rm $(dirname {output.nonpareil})/$base
         
