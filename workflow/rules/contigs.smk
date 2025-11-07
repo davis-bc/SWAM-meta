@@ -30,7 +30,7 @@ rule contigs:
         r1       = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
         r2       = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz")
     output:
-        megahit     = protected(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"))
+        megahit  = protected(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"))
     resources:
         mem_mb = 150000,
         threads = 32,
@@ -44,7 +44,7 @@ rule contigs:
         echo "assembling with megahit"
 
         # create temporary directory in same parent so moves are on same fs (atomic)
-        tmpdir="$(mktemp -d "$(dirname {output.megahit})/.megahit_{wildcards.sample}.tmp.XXXXXX")"
+        tmpdir="$(mktemp -d "$(dirname {output.megahit})/megahit_{wildcards.sample}.tmp.XXXXXX")"
 
         # Run MEGAHIT into the temporary directory
         megahit -1 {input.r1} -2 {input.r2} \
@@ -63,9 +63,9 @@ rule contigs:
         # Clean up the rest of temporary files
         rm -rf "$tmpdir"
         
-        # rename all contigs to include sample information
-        awk -v sample="{wildcards.sample}" ' /^>/ { header = substr($0, 2) # drop leading ">" match(header, /^[^[:space:]]+/) # find first token (contig id) id = substr(header, RSTART, RLENGTH) rest = substr(header, RLENGTH + 1) # the rest (may be "") printf(">%s_%s%s\n", sample, id, rest) next } { print } ' {output.megahit} > {output.megahit}.tmp && mv -f {output.megahit}.tmp {output.megahit}
-
+        # rename fasta headers to include sample information
+        sed -E -i 's/>/>{wildcards.sample}-/g' {output.megahit}
+        
         """
     
 # ------------------------------------------------------------------------
@@ -74,15 +74,11 @@ rule contigs:
 
 rule genomad:
     input:
-        r1           = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
-        r2           = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz"),
         contigs      = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
         genomad_db   = os.path.join(output_dir, "data", "genomad", ".genomad.db.done.txt")
     output:
         genomad      = directory(os.path.join(output_dir, "data", "genomad", "{sample}")),
-        plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}_plasmid.fna"),
-        contig_bam   = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.plasmid.bam"),
-        circular_txt = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs-circular.txt")
+        plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid.fna")
     resources:
         mem_mb = 150000,
         threads = 32,
@@ -96,12 +92,6 @@ rule genomad:
         echo "running geNomad"
         genomad end-to-end {input.contigs} {output.genomad} $(dirname {input.genomad_db})/genomad_db --relaxed --cleanup
         
-        # map reads to plasmid contigs
-        minimap2 -t {resources.threads} -ax sr {output.plas_contigs} {input.r1} {input.r2} | samtools sort -o {output.contig_bam}
-        
-        # detect circularity of plasmid contigs
-        workflow/scripts/detect_circular_contigs.py -b {output.contig_bam} -o {output.circular_txt}
-        
         """
 
 # ----------------------------------------------------------------------------------
@@ -110,10 +100,13 @@ rule genomad:
 
 rule mobmess:
     input:
-        circular_txt    = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs-circular.txt"),
-        plas_contigs    = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}_plasmid.fna")
+        r1           = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
+        r2           = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz"),
+        plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}",  "{sample}.contigs_summary", "{sample}.contigs_plasmid.fna")
     output:
-        mobmess         = os.path.join(output_dir, "data", "mobmess", "{sample}")
+        circular_txt = os.path.join(output_dir, "data", "mobmess", "{sample}.contigs_circular.txt"),
+        contig_bam   = os.path.join(output_dir, "data", "mobmess", "{sample}.contigs_plasmid.bam"),
+        mobmess      = os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt")
     conda: "../envs/contigs.yaml"
     resources:
         mem_mb = 150000,
@@ -121,12 +114,15 @@ rule mobmess:
         time = "1-00:00:00"
     shell:
         """
+        # map reads to plasmid contigs
+        minimap2 -t {resources.threads} -ax sr {input.plas_contigs} {input.r1} {input.r2} | samtools sort -@4 -o {output.contig_bam} - && samtools index {output.contig_bam}
+        
+        # detect circularity of plasmid contigs
+        workflow/scripts/detect_circular_contigs.py -b {output.contig_bam} -o {output.circular_txt}
+        
         # run mobmess to infer plasmid systems 
-        mobmess systems \
-        --sequences {input.plas_contigs} \
-        --complete {input.circular_txt} \
-        --output {output.mobmess}-mobmess \
-        --threads {resources.threads}
+        mobmess systems --sequences {input.plas_contigs} --complete {output.circular_txt} --output $(dirname {output.mobmess})/{wildcards.sample}-mobmess --threads {resources.threads}
+        
         """
         
         

@@ -9,7 +9,7 @@ dependencies:
   - minimap2
   - mmseqs2
   - prodigal
-  - numpy 
+  - numpy=1.23.* 
   - pandas 
   - scipy 
   - scikit-learn 

@@ -68,12 +68,8 @@ rule short_reads:
         TMP_R1="$TMPDIR/{wildcards.sample}_R1.fastq.gz"
         TMP_R2="$TMPDIR/{wildcards.sample}_R2.fastq.gz"
         
-        # ensure the temporary files are removed on any exit
-        trap 'rm -f "$TMP_R1" "$TMP_R2"' EXIT
-        
         # run fastp using temporary files
         echo "cleaning reads with fastp"
-        
         fastp -i {input.r1} -I {input.r2} -o "$TMP_R1" -O "$TMP_R2" --html /dev/null/ --json {output.json}
 
         # filter out human reads, ensure final output has equal number of reads
@@ -84,13 +80,22 @@ rule short_reads:
                  -2 >(pigz -p {resources.threads} > {output.r2_clean}) \
                  -0 /dev/null -
         
+        rm -f "$TMP_R1" "$TMP_R2"
+        
         # run KMA against AMRFinderPlus
         echo "aligning reads to AMRFinderPlus with KMA"
         kma -ipe {output.r1_clean} {output.r2_clean} -o $(dirname {output.afp})/{wildcards.sample}.afp -t_db $(dirname {input.afp_db})/afp_db -1t1 -t {resources.threads}
         
+        # create temp single-end file for diamond
+        TMP_SE="$TMPDIR/{wildcards.sample}_SE.fastq.gz"
+        cat {output.r1_clean} {output.r2_clean} > "$TMP_SE"
+        
+        
         # Run diamond against single-copy genes for cell normalization
         echo "aligning reads to single copy genes with diamond"
-        diamond blastx --db $(dirname {input.scg_db})/scg_db --query {output.r1_clean} {output.r2_clean} --out {output.scgs} --outfmt 6 qseqid sseqid pident length evalue bitscore slen --fast --max-target-seqs 1 --threads {resources.threads} --quiet
+        diamond blastx --db $(dirname {input.scg_db})/scg_db --query "$TMP_SE" --out {output.scgs} --outfmt 6 qseqid sseqid pident length evalue bitscore slen --fast --max-target-seqs 1 --threads {resources.threads} --quiet
+        
+        rm -f "$TMP_SE"
         
         # run nonpareil to calcualte metagenomic coverage
         echo "estimating metagenomic coverage with nonpareil"
