@@ -124,3 +124,35 @@ The full pipeline is implemented end-to-end across four rule files:
 - MAG taxonomy (`mag_taxonomy`) and metabolism (`mag_metabolism`) require large external databases (GTDB-tk, METABOLIC); skipped in test mode and when `skip_gtdbtk: True` / `skip_metabolic: True`.
 - `contig_summary.py` script exists but content not reviewed this session.
 - MobMess/PlasX require internet access on first `--use-conda` setup (pip install from GitHub).
+
+---
+
+## 2026-02-22 (session 6)
+
+### What was done
+- **AMR_unified.csv feature implemented** (commit `ac36b6d`): New cross-stream AMR abundance table merging short-read KMA detections with contig-level AMRFinderPlus annotations.
+  - New `workflow/rules/summary.smk` with `localrule amr_unified`
+  - New `workflow/scripts/amr_unified.py`: outer-joins `short_reads_output.csv` + `contig_summary.tsv` (AMR rows only) on `sample × gene_symbol`
+  - **cpg priority**: contig cpg preferred when available (higher specificity), else short-reads cpg
+  - **`evidence` column**: `"both"` | `"short_reads_only"` | `"contigs_only"`
+  - **`molecule_type`**: comma-sep sorted unique values per gene × sample (e.g., `"phage,plasmid"` when gene found on both)
+  - **`taxonomy`**: modal non-empty value from contig annotations (empty string for short_reads_only)
+  - **AMRFinderPlus catalog metadata** (gene_family, class, subclass, type, subtype) joined from `ReferenceGeneCatalog.txt`
+  - Fixed pandas 2.0 compatibility (removed `include_groups=False` from `groupby.apply`)
+  - Added `AMR_unified.csv` to `all_targets()` in `Snakefile`
+- Verified on test data: `blaTEM-1` correctly tagged `evidence=both`, contig cpg preferred; `tet(M)` shows `molecule_type=phage,plasmid`.
+
+### Current pipeline state
+
+| Rule file | Status | Key rules |
+|-----------|--------|-----------|
+| `short_reads.smk` | ✅ Complete | `initiate_dbs`, `short_reads`, `short_reads_summary` |
+| `contigs.smk` | ✅ Complete | `contigs`, `genomad`, `mobmess`, `prodigal`, `contig_amr`, `mge_annotation`, `mmseqs_taxonomy`, `contig_abundance`, `contig_summary` |
+| `mags.smk` | ✅ Complete | `bin`, `mag_prodigal`, `mag_amr`, `mag_mge`, `mag_taxonomy`, `mag_metabolism`, `mag_abundance` |
+| `summary.smk` | ✅ Complete (new) | `amr_unified` |
+| Test infrastructure | ✅ Complete | Mock data, mini DBs, `--config test=True` |
+
+### Known issues / next steps
+- **Catalog metadata sparse in test output**: test catalog uses synthetic gene names (`fakeGene_*`) so only `blaTEM-1` gets metadata annotated; production run with real ReferenceGeneCatalog will populate all rows.
+- Consider adding a contig-level AMR annotation lookup using the real catalog at runtime (post-assembly) to enrich `contigs_only` rows with gene_family/class/etc. when not in catalog.
+- `short_reads_only` evidence will appear in production runs where KMA detects genes at low read depth that don't assemble (expected for low-abundance resistome members).
