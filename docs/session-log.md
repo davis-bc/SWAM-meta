@@ -39,6 +39,24 @@ All stages fully implemented and test data ready. Key additions since last sessi
 
 ---
 
+## 2026-02-22 (session 4)
+
+### What was done
+- **Bug fix — OOM crash on test run**: All jobs died with `SIGTERM` because `threads` was placed inside `resources:` instead of as a top-level `threads:` directive. Snakemake only uses the `threads:` directive for core-based scheduling; `resources: threads` is a custom resource it ignores for that purpose. With `--cores 4`, Snakemake treated every job as 1-core and allowed up to 4 memory-intensive jobs (geNomad ×2, MEGAHIT, mmseqs, contig_abundance, etc.) to run simultaneously, exhausting RAM and crashing Ubuntu via the OOM killer.
+- **Fix**: Added `threads: lambda wc: res(X, Y)` top-level directive to all compute-intensive rules in `short_reads.smk`, `contigs.smk`, and `mags.smk`. Shell commands continue using `{resources.threads}` unchanged (both can coexist).
+- **Bonus fix**: Set `genomad_splits=4` as the default in test mode (`config.setdefault("genomad_splits", 4)` in `common.smk`) to further reduce geNomad peak memory. Can be overridden with `--config genomad_splits=N`.
+- Dry run (`snakemake -n --config test=True --cores 4`) passes cleanly.
+- Pushed to `origin/main` (commit `b85f186`).
+
+### Current pipeline state
+Same as session 3 — all stages implemented. The only change is the scheduling fix above.
+
+### Known issues / next steps
+- Re-run the full test (`snakemake --use-conda --cores 4 --config test=True`) to confirm end-to-end success now that parallel OOM is prevented.
+- If memory is still tight, run with `--cores 2` to further limit parallelism, or add `--resources mem_mb=12000` to cap total concurrent memory usage.
+
+---
+
 ## 2026-02-22 (session 3)
 
 ### What was done
