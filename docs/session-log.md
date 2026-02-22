@@ -37,6 +37,27 @@ All stages fully implemented and test data ready. Key additions since last sessi
 - `test/output/` (gitignored) contains old test run outputs and will need to be cleared before running with the new mock data.
 - Reference genomes source: `/home/benda/Projects/databases/test-genomes/` — required locally to re-run `generate_mock_data.py`.
 
+---
+
+## 2026-02-22 (session 3)
+
+### What was done
+- **Bug fix — markers always showing 0 cpg**: KMA includes the full FASTA description in the `#Template` column (e.g., `U30316.1 Bacteroides fragilis strain IB143 plasmid pBI143, complete sequence`), but the R script was filtering by exact accession match (`template == "U30316.1"`), which never succeeded. Fixed by extracting the accession before the first space: `mutate(seq_id = str_extract(template, "^\\S+"))` and filtering on `seq_id`.
+- **Bug fix — robustify AFM template accession extraction**: Added `str_extract(refseq_nucleotide_accession, "^\\S+")` after the `separate()` call to strip any trailing description text from the nucleotide accession used as the catalog join key. Addresses the reported "AMRFinderPlus metadata missing" production issue (likely caused by the same KMA full-description behaviour on some database versions).
+- **Test confirmed**: Deleted and re-ran `short_reads_summary` in test mode. `AMR_abundance_summary.csv` now correctly shows non-zero pBI143/crAss001 cpg values (mock1: pBI143=3.64, crAss001=0.50; mock2: crAss001=0.49). AMR metadata still fully populated.
+- **Note**: All changes confined to `workflow/scripts/short_reads_processing.R`. No Snakemake rule or conda env changes needed.
+
+### Current pipeline state
+All stages implemented. Short-reads summary outputs are:
+- `fastp_summary.csv` — per-sample QC metrics
+- `short_reads_output.csv` — per-gene AMR abundance in cpg with full metadata
+- `AMR_abundance_summary.csv` — per-sample totals: AMR_total (cpg) | pBI143 (cpg) | crAss001 (cpg)
+
+### Known issues / next steps
+- Production run OOM'd (likely during MEGAHIT or MetaBAT2). Need to investigate peak memory rule and adjust resources or assembly parameters.
+- pBI143 and crAss001 references are stored at `/home/benda/Projects/databases/reference-sequences/` (production) and `test/dbs/markers/` (test). Both use the same FASTA headers.
+- Full end-to-end test on this machine is blocked by memory — short-reads-only testing is feasible.
+
 
 ### What was done
 - Wrote a comprehensive `README.md` covering: pipeline overview (ASCII flow diagram), requirements, configuration, run commands, test mode, outputs table, cpg normalisation formula, and repository structure.

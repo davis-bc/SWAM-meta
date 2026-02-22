@@ -14,11 +14,13 @@ scgs            <- snakemake@input[["scgs"]]
 npos            <- snakemake@input[["npos"]]
 jsons           <- snakemake@input[["jsons"]]
 afp_path        <- snakemake@input[["afp_metadata"]]
+markers_files   <- snakemake@input[["markers_files"]]
 
 # Output files
 
 out_file1 <- snakemake@output[[1]]
 out_file2 <- snakemake@output[[2]]
+out_file3 <- snakemake@output[[3]]
 
 
 ###############################################
@@ -118,9 +120,13 @@ afp <- do.call(bind_rows, lapply(afp_files, function(f) {
   if (is.null(x) || nrow(x) == 0) return(NULL)
   x$sample <- sub(".afp.res", "", basename(f))
   x <- x %>% relocate(sample)
-  x <- x %>% separate(`#Template`, into=c("GI", "refseq_protein_accession", "refseq_nucleotide_accession",
-                      "fg1", "fg2", "node_id", "parent_node_id", "res_mech_type"), sep="\\|")
-  x <- x %>% separate(res_mech_type, into=c("res_mech_type", "protein_name"), sep=" ")
+  x <- x %>% separate(`#Template`,
+                       into = c("refseq_protein_accession", "refseq_nucleotide_accession",
+                                "start", "stop", "allele_kma", "gene_family_kma", "desc_kma"),
+                       sep = "\\|", extra = "merge", fill = "right") %>%
+             # KMA includes the full FASTA description after the first space in the
+             # sequence identifier; strip it so the accession join key is clean.
+             mutate(refseq_nucleotide_accession = str_extract(refseq_nucleotide_accession, "^\\S+"))
   x
 }))
 
@@ -174,5 +180,64 @@ if (!is.null(afp) && nrow(afp) > 0) {
 write.csv(fastp_summary, out_file1, row.names=F)
 write.csv(afp_long, out_file2, row.names=F)
 
+
+###############################################
+###   anthropogenic markers (pBI143, crAss001)
+###############################################
+
+markers <- do.call(bind_rows, lapply(markers_files, function(f) {
+  x <- tryCatch(read_tsv(f, col_types = cols()),
+                error = function(e) NULL)
+  if (is.null(x) || nrow(x) == 0) return(NULL)
+  x$sample <- sub("\\.markers\\.res$", "", basename(f))
+  x <- x %>% relocate(sample) %>% rename(template = `#Template`)
+  x
+}))
+
+if (!is.null(markers) && nrow(markers) > 0) {
+  marker_cpg <- markers %>%
+    # KMA includes the full FASTA description after the first space in the template
+    # identifier; extract only the accession to allow reliable matching.
+    mutate(seq_id = str_extract(template, "^\\S+")) %>%
+    left_join(genome.counts, by = "sample") %>%
+    left_join(fastp_summary %>% select(sample, avg_read_length), by = "sample") %>%
+    mutate(cpg = Depth / n_genomes) %>%
+    select(sample, seq_id, cpg)
+} else {
+  marker_cpg <- tibble(sample = character(), seq_id = character(), cpg = double())
+}
+
+###############################################
+###   AMR abundance summary
+###############################################
+
+amr_total <- if (nrow(afp_long) > 0) {
+  afp_long %>%
+    filter(type == "AMR") %>%
+    group_by(sample) %>%
+    summarise(`AMR_total (cpg)` = sum(cpg, na.rm = TRUE), .groups = "drop")
+} else {
+  tibble(sample = character(), `AMR_total (cpg)` = double())
+}
+
+pbi143_cpg <- marker_cpg %>%
+  filter(seq_id == "U30316.1") %>%
+  select(sample, `pBI143 (cpg)` = cpg)
+
+crass_cpg <- marker_cpg %>%
+  filter(seq_id == "NC_049977.1") %>%
+  select(sample, `crAss001 (cpg)` = cpg)
+
+amr_abundance <- tibble(sample = unique(fastp_summary$sample)) %>%
+  left_join(amr_total, by = "sample") %>%
+  left_join(pbi143_cpg, by = "sample") %>%
+  left_join(crass_cpg, by = "sample") %>%
+  mutate(
+    `AMR_total (cpg)` = replace_na(`AMR_total (cpg)`, 0),
+    `pBI143 (cpg)`    = replace_na(`pBI143 (cpg)`, 0),
+    `crAss001 (cpg)`  = replace_na(`crAss001 (cpg)`, 0)
+  )
+
+write.csv(amr_abundance, out_file3, row.names = FALSE)
 
 
