@@ -1,5 +1,11 @@
 # SWAM-meta Copilot Instructions
 
+## Session continuity
+
+**At the start of every session:** read `docs/session-log.md` to restore context on project history, current pipeline state, and any outstanding issues.
+
+**At the end of every session** (or after completing significant work): append a new dated entry to `docs/session-log.md` summarising what was done, the current pipeline state, and any known issues or next steps. Commit the updated log.
+
 ## Overview
 
 SWAM-meta is a Snakemake workflow for end-to-end metagenomic analysis of antibiotic resistance in environmental bacterial communities. Full pipeline: read QC and host filtering → AMR gene alignment (short-read) → metagenomic coverage estimation → de novo assembly → contig classification (chromosome/plasmid/phage) → taxonomic assignment → MGE annotation → contig abundance → contig summary → MAG binning → MAG characterisation (AMR, MGE, taxonomy, metabolism, abundance).
