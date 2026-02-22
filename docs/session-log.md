@@ -156,3 +156,45 @@ The full pipeline is implemented end-to-end across four rule files:
 - **Catalog metadata sparse in test output**: test catalog uses synthetic gene names (`fakeGene_*`) so only `blaTEM-1` gets metadata annotated; production run with real ReferenceGeneCatalog will populate all rows.
 - Consider adding a contig-level AMR annotation lookup using the real catalog at runtime (post-assembly) to enrich `contigs_only` rows with gene_family/class/etc. when not in catalog.
 - `short_reads_only` evidence will appear in production runs where KMA detects genes at low read depth that don't assemble (expected for low-abundance resistome members).
+
+---
+
+## 2026-02-22 (session 7)
+
+### What was done
+Four issues fixed in the unified AMR output:
+
+**1. Test KMA database too small** (`test/dbs/amrfinder/`)
+- The test `AMR_CDS.fa` had only 11 synthetic genes + blaTEM-1, causing `short_reads_output.csv` to detect only blaTEM-1.
+- Wrote a script that extracts 49 real AMR gene nucleotide sequences from assembled contigs (using AMRFinder coordinates, strand-aware reverse complement) and adds them to `AMR_CDS.fa` with proper AMRFinderPlus-style FASTA headers.
+- Updated `ReferenceGeneCatalog.txt` with synthetic `NG_MOCK_*` accessions matching the FASTA headers so the R catalog join succeeds.
+- `short_reads_output.csv` now detects 81 gene-per-sample entries across both mock samples.
+
+**2. MGE parsing broken in contig_summary.py**
+- MobileElementFinder output is CSV (comma-separated) but `safe_read` used tab separator → single-column DataFrame → all fields empty.
+- Comment lines (e.g. `#date:`, `#sample:`) were parsed as data.
+- `stop_col` search was missing "end" (the actual column name in mge_finder output).
+- Contig IDs had extra metadata appended (`"contig_id flag=1 multi=..."`) that failed mol_map/tax_map lookups.
+- Fixed: `parse_mge` now uses `pd.read_csv(sep=",", comment="#")`, strips contig ID to first token, and includes "end" in stop_col candidates.
+
+**3. amr_unified.py metadata was empty for most genes**
+- Previous version joined metadata from `ReferenceGeneCatalog.txt` only (synthetic in test mode).
+- Rebuilt metadata lookup from `*_contig_amr.tsv` files directly (highest priority), with fallback to short_reads catalog join, then the catalog file.
+- All genes in the unified output now have product_name, class, subclass, type, subtype populated.
+
+**4. AMR_abundance_summary.csv now uses unified totals**
+- R script `short_reads_processing.R` now outputs `markers_cpg.csv` (pBI143/crAss001 per sample) as out_file3 instead of `AMR_abundance_summary.csv`.
+- `amr_unified.py` reads `markers_cpg.csv` as input and generates `AMR_abundance_summary.csv` from the unified cpg totals (contig preferred, else short-reads) + marker cpg values.
+- `short_reads_summary` rule output renamed `amr_summary` → `markers_cpg`.
+- `summary.smk` `amr_unified` rule: added `markers_cpg` input, second output `amr_abundance_summary`.
+
+### Current pipeline state
+All 31 jobs pass in test mode. Terminal outputs:
+- `fastp_summary.csv`, `short_reads_output.csv`, `markers_cpg.csv` (from short_reads)
+- `contig_summary.tsv` (AMR+MGE fully populated with contig_id, gene, coords, molecule_type)
+- `AMR_unified.csv` (78 `both`, 3 `short_reads_only`, 0 `contigs_only` in test data)
+- `AMR_abundance_summary.csv` (unified AMR total + pBI143 + crAss001 per sample)
+
+### Known issues / next steps
+- `gene_family` in `AMR_unified.csv` uses the gene symbol itself (not a gene family grouping) for contig-detected genes, since AMRFinder direct output doesn't provide a gene_family column. Production runs with the full catalog will populate this correctly for known alleles.
+- `short_reads_only` evidence is rare in test data (3 genes: cmlA1 and 2 others in mock2) because the test reads come from the same organisms whose contigs were assembled — expected in production to be more prevalent for low-depth genes.
