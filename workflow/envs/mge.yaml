@@ -1,0 +1,21 @@
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - prodigal
+  - blast
+  - samtools
+  - minimap2
+  - python >=3.9
+  - pandas
+  - numpy
+  - biopython <=1.80
+  - tabulate
+  - pyyaml
+  - click
+  - attrs
+  - cattrs
+  - bcbio-gff
+  - setuptools <70
+  - pip

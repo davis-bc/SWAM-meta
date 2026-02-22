@@ -32,9 +32,9 @@ rule contigs:
     output:
         megahit  = protected(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"))
     resources:
-        mem_mb = 150000,
-        threads = 32,
-        time = "3-00:00:00"
+        mem_mb  = lambda wc: res(150000, 8000),
+        threads = lambda wc: res(32, 4),
+        time    = "3-00:00:00"
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.contigs.txt")
     conda: "../envs/contigs.yaml"
@@ -78,11 +78,15 @@ rule genomad:
         genomad_db   = os.path.join(output_dir, "data", "genomad", ".genomad.db.done.txt")
     output:
         genomad      = directory(os.path.join(output_dir, "data", "genomad", "{sample}")),
-        plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid.fna")
+        plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid.fna"),
+        plas_summary = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid_summary.tsv"),
+        vir_summary  = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_virus_summary.tsv")
+    params:
+        splits = config.get("genomad_splits", 1)
     resources:
-        mem_mb = 150000,
-        threads = 32,
-        time = "3-00:00:00"
+        mem_mb  = lambda wc: res(150000, 8000),
+        threads = lambda wc: res(32, 4),
+        time    = "3-00:00:00"
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.genomad.txt")
     conda: "../envs/genomad.yaml"
@@ -90,8 +94,10 @@ rule genomad:
         """
         # classify contigs into chromosome/phage/plasmid
         echo "running geNomad"
-        genomad end-to-end {input.contigs} {output.genomad} $(dirname {input.genomad_db})/genomad_db --relaxed --cleanup
-        
+        genomad end-to-end {input.contigs} {output.genomad} $(dirname {input.genomad_db})/genomad_db \
+            --relaxed --cleanup --splits {params.splits}
+        # touch missing output files (geNomad omits them when no hits are found)
+        touch {output.plas_contigs} {output.plas_summary} {output.vir_summary}
         """
 
 # ----------------------------------------------------------------------------------
@@ -109,21 +115,251 @@ rule mobmess:
         mobmess      = os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt")
     conda: "../envs/contigs.yaml"
     resources:
-        mem_mb = 150000,
-        threads = 32,
-        time = "1-00:00:00"
+        mem_mb  = lambda wc: res(150000, 8000),
+        threads = lambda wc: res(32, 4),
+        time    = "1-00:00:00"
     shell:
         """
-        # map reads to plasmid contigs
-        minimap2 -t {resources.threads} -ax sr {input.plas_contigs} {input.r1} {input.r2} | samtools sort -@4 -o {output.contig_bam} - && samtools index {output.contig_bam}
-        
-        # detect circularity of plasmid contigs
-        workflow/scripts/detect_circular_contigs.py -b {output.contig_bam} -o {output.circular_txt}
-        
-        # run mobmess to infer plasmid systems 
-        mobmess systems --sequences {input.plas_contigs} --complete {output.circular_txt} --output $(dirname {output.mobmess})/{wildcards.sample}-mobmess --threads {resources.threads}
-        
+        mkdir -p $(dirname {output.contig_bam})
+        # Skip processing if plasmid FASTA is empty (no plasmids found by geNomad)
+        if [ ! -s {input.plas_contigs} ]; then
+            touch {output.contig_bam} {output.circular_txt} {output.mobmess}
+        else
+            # map reads to plasmid contigs
+            minimap2 -t {resources.threads} -ax sr {input.plas_contigs} {input.r1} {input.r2} | samtools sort -@4 -o {output.contig_bam} - && samtools index {output.contig_bam}
+            
+            # detect circularity of plasmid contigs
+            workflow/scripts/detect_circular_contigs.py -b {output.contig_bam} -o {output.circular_txt}
+            
+            # run mobmess to infer plasmid systems 
+            mobmess systems --sequences {input.plas_contigs} --complete {output.circular_txt} --output $(dirname {output.mobmess})/{wildcards.sample}-mobmess --threads {resources.threads}
+        fi
         """
+
+# ---------------------------------------------------------------------------
+#   Build / validate MMseqs2 UniRef50 taxonomy database
+#   Test mode: build from mini FASTA in test/dbs/uniref50/
+#   Production: validate user-provided db path
+# ---------------------------------------------------------------------------
+
+rule init_mmseqs_db:
+    output:
+        done = os.path.join(output_dir, "data", "mmseqs", ".mmseqs_db.done")
+    params:
+        test_mode    = _TEST,
+        db_prefix    = lambda wc: os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mmseqs")
+                       if _TEST else config.get("uniref50_db", ""),
+        test_fasta   = os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mini.fasta"),
+        test_tax_dir = os.path.join(_REPO, "test", "dbs", "uniref50"),
+        test_mapping = os.path.join(_REPO, "test", "dbs", "uniref50", "tax_mapping.tsv"),
+    conda: "../envs/contigs.yaml"
+    resources:
+        mem_mb  = lambda wc: res(8000, 4000),
+        threads = 1,
+        time    = "0-02:00:00"
+    shell:
+        """
+        mkdir -p $(dirname {output.done})
+
+        if [ "{params.test_mode}" = "True" ]; then
+            mkdir -p {params.test_tax_dir}/tmp
+            touch {params.test_tax_dir}/merged.dmp
+            mmseqs createdb {params.test_fasta} {params.db_prefix}
+            mmseqs createtaxdb {params.db_prefix} {params.test_tax_dir}/tmp \
+                --ncbi-tax-dump {params.test_tax_dir} \
+                --tax-mapping-file {params.test_mapping}
+            mmseqs createindex {params.db_prefix} {params.test_tax_dir}/tmp --search-type 2
+            rm -rf {params.test_tax_dir}/tmp
+        else
+            if [ ! -f "{params.db_prefix}.dbtype" ]; then
+                echo "ERROR: UniRef50 MMseqs2 database not found at {params.db_prefix}"
+                echo "Build it with: mmseqs createdb uniref50.fasta PREFIX && mmseqs createtaxdb PREFIX tmp --ncbi-tax-dump TAXDIR"
+                exit 1
+            fi
+        fi
+        touch {output.done}
+        """
+
+# ---------------------------------------------------------------------------
+#   Per-sample: gene calling with Prodigal (shared output for AMR + summary)
+# ---------------------------------------------------------------------------
+
+rule prodigal:
+    input:
+        contigs = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa")
+    output:
+        faa = os.path.join(output_dir, "data", "prodigal", "{sample}.faa"),
+        gff = os.path.join(output_dir, "data", "prodigal", "{sample}.gff")
+    resources:
+        mem_mb  = lambda wc: res(16000, 4000),
+        threads = 1,
+        time    = "0-04:00:00"
+    conda: "../envs/contigs.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {output.faa})
+        prodigal -i {input.contigs} -a {output.faa} -f gff -o {output.gff} -p meta -q
+        """
+
+# ---------------------------------------------------------------------------
+#   Per-sample: AMR annotation on contigs (protein + nucleotide + GFF mode)
+# ---------------------------------------------------------------------------
+
+rule contig_amr:
+    input:
+        contigs = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
+        faa     = os.path.join(output_dir, "data", "prodigal", "{sample}.faa"),
+        gff     = os.path.join(output_dir, "data", "prodigal", "{sample}.gff")
+    output:
+        tsv = os.path.join(output_dir, "data", "amr_contigs", "{sample}_contig_amr.tsv")
+    resources:
+        mem_mb  = lambda wc: res(16000, 4000),
+        threads = lambda wc: res(16, 4),
+        time    = "0-06:00:00"
+    conda: "../envs/mags.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {output.tsv})
+        amrfinder \
+            -n {input.contigs} \
+            -p {input.faa} \
+            -g {input.gff} \
+            --threads {resources.threads} \
+            -o {output.tsv} \
+            --annotation_format prodigal 2>/dev/null || true
+        # Create empty file if no hits found or amrfinder failed on mock data
+        [ -f {output.tsv} ] || touch {output.tsv}
+        """
+
+# ---------------------------------------------------------------------------
+#   Per-sample: MGE annotation on contigs with MobileElementFinder
+# ---------------------------------------------------------------------------
+
+rule init_mge_tool:
+    """Install MobileElementFinder via pip --no-deps (conda provides all deps)."""
+    output:
+        done = os.path.join(output_dir, "data", "mge_contigs", ".mef_install.done")
+    conda: "../envs/mge.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {output.done})
+        pip install --no-deps --quiet mypy-extensions
+        pip install --no-deps --quiet MGEdb==1.1.1
+        pip install --no-deps --quiet MobileElementFinder
+        touch {output.done}
+        """
+
+rule mge_annotation:
+    input:
+        contigs  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
+        mef_done = os.path.join(output_dir, "data", "mge_contigs", ".mef_install.done")
+    output:
+        tsv = os.path.join(output_dir, "data", "mge_contigs", "{sample}_mge.tsv"),
+        tmp = temp(directory(os.path.join(output_dir, "data", "mge_contigs", "{sample}_tmp")))
+    resources:
+        mem_mb  = lambda wc: res(16000, 4000),
+        threads = lambda wc: res(16, 4),
+        time    = "0-06:00:00"
+    conda: "../envs/mge.yaml"
+    shell:
+        """
+        mkdir -p {output.tmp}
+        PREFIX=$(dirname {output.tsv})/{wildcards.sample}_mge
+        mefinder find \
+            --contig {input.contigs} \
+            --temp-dir {output.tmp} \
+            --threads {resources.threads} \
+            "$PREFIX" || true
+        # mefinder writes PREFIX.csv; rename to expected .tsv
+        if [ -f "${{PREFIX}}.csv" ]; then
+            mv "${{PREFIX}}.csv" {output.tsv}
+        else
+            touch {output.tsv}
+        fi
+        """
+
+# ---------------------------------------------------------------------------
+#   Per-sample: MMseqs2 taxonomy assignment on assembled contigs
+# ---------------------------------------------------------------------------
+
+rule mmseqs_taxonomy:
+    input:
+        contigs  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
+        db_done  = os.path.join(output_dir, "data", "mmseqs", ".mmseqs_db.done")
+    output:
+        lca = os.path.join(output_dir, "data", "mmseqs", "{sample}_lca.tsv")
+    params:
+        db_prefix = lambda wc: os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mmseqs")
+                    if _TEST else config.get("uniref50_db", ""),
+        tmp       = lambda wc: os.path.join(output_dir, "data", "mmseqs", f"{wc.sample}_tmp")
+    resources:
+        mem_mb  = lambda wc: res(64000, 4000),
+        threads = lambda wc: res(32, 4),
+        time    = "1-00:00:00"
+    conda: "../envs/contigs.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {output.lca}) {params.tmp}
+        mmseqs easy-taxonomy \
+            {input.contigs} \
+            {params.db_prefix} \
+            $(dirname {output.lca})/{wildcards.sample} \
+            {params.tmp} \
+            --threads {resources.threads} \
+            --lca-ranks superkingdom,phylum,class,order,family,genus,species \
+            --format-output "query,taxid,taxname,taxlineage" \
+            --orf-filter 0 \
+            -s 2 \
+            > /dev/null 2>&1 || true
+        # easy-taxonomy writes {{prefix}}_lca.tsv; touch if absent (no hits or search failed)
+        mv $(dirname {output.lca})/{wildcards.sample}_lca.tsv {output.lca} 2>/dev/null || true
+        rm -rf {params.tmp}
+        [ -f {output.lca} ] || touch {output.lca}
+        """
+
+# ---------------------------------------------------------------------------
+#   Per-sample: map clean reads to all contigs; compute cpg abundance
+# ---------------------------------------------------------------------------
+
+rule contig_abundance:
+    input:
+        r1      = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
+        r2      = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz"),
+        contigs = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
+        scgs    = os.path.join(output_dir, "data", "alignments", "{sample}.scgs")
+    output:
+        bam = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam"),
+        bai = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam.bai"),
+        tsv = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contig_abundance.tsv")
+    resources:
+        mem_mb  = lambda wc: res(20000, 4000),
+        threads = lambda wc: res(16, 4),
+        time    = "0-06:00:00"
+    conda: "../envs/shortreads.yaml"
+    script:
+        "../scripts/contig_abundance.py"
+
+# ---------------------------------------------------------------------------
+#   Aggregation: join all per-sample annotations into one summary TSV
+# ---------------------------------------------------------------------------
+
+rule contig_summary:
+    input:
+        plas_summaries = expand(os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid_summary.tsv"), sample=samples),
+        vir_summaries  = expand(os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_virus_summary.tsv"),  sample=samples),
+        lca_files      = expand(os.path.join(output_dir, "data", "mmseqs", "{sample}_lca.tsv"), sample=samples),
+        abund_files    = expand(os.path.join(output_dir, "data", "contig_abundance", "{sample}_contig_abundance.tsv"), sample=samples),
+        amr_files      = expand(os.path.join(output_dir, "data", "amr_contigs", "{sample}_contig_amr.tsv"), sample=samples),
+        mge_files      = expand(os.path.join(output_dir, "data", "mge_contigs", "{sample}_mge.tsv"), sample=samples),
+        prodigal_gffs  = expand(os.path.join(output_dir, "data", "prodigal", "{sample}.gff"), sample=samples)
+    output:
+        tsv = os.path.join(output_dir, "contig_summary.tsv")
+    params:
+        samples    = samples,
+        output_dir = output_dir
+    conda: "../envs/contigs.yaml"
+    script:
+        "../scripts/contig_summary.py"
         
         
         

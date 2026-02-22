@@ -23,17 +23,50 @@ configfile: "config/config.yaml"
 include: "rules/common.smk"
 include: "rules/short_reads.smk"
 include: "rules/contigs.smk"
+include: "rules/mags.smk"
 
-localrules: initiate_dbs, short_reads_summary, init_genomad
+localrules: initiate_dbs, short_reads_summary, init_genomad, init_mmseqs_db, init_mge_tool, contig_summary
 
 # ------------------------------------------
 #   Define the target outputs for pipeline
 # ------------------------------------------
 
+def all_targets(wildcards):
+    targets = [
+        # Short-read summary
+        os.path.join(output_dir, "fastp_summary.csv"),
+        os.path.join(output_dir, "short_reads_output.csv"),
+        # Assembly
+        *expand(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"), sample=samples),
+        # geNomad classification
+        *expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples),
+        # MobMess plasmid systems
+        *expand(os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt"), sample=samples),
+        # Contig-level summary (AMR + MGE + taxonomy + abundance)
+        os.path.join(output_dir, "contig_summary.tsv"),
+        # MAG binning
+        *expand(os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"), sample=samples),
+        # MAG AMR + MGE
+        *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_amr.tsv"), sample=samples),
+        *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_mge.tsv"), sample=samples),
+        # MAG abundance
+        *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_abundance.tsv"), sample=samples),
+    ]
+
+    # Optional large-DB steps (skipped in test mode or when explicitly disabled)
+    if not config.get("skip_gtdbtk", False):
+        targets += expand(
+            os.path.join(output_dir, "data", "bins", "{sample}", "gtdbtk.summary.tsv"),
+            sample=samples
+        )
+    if not config.get("skip_metabolic", False):
+        targets += expand(
+            os.path.join(output_dir, "data", "bins", "{sample}", ".metabolic.done"),
+            sample=samples
+        )
+
+    return targets
+
+
 rule all:
-    input:
-        fastp        = os.path.join(output_dir, "fastp_summary.csv"),
-        short_reads  = os.path.join(output_dir, "short_reads_output.csv"),
-        contigs      = expand(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"), sample=samples),
-        genomad      = expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples),
-        mobmess      = expand(os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt"), sample=samples)
+    input: all_targets

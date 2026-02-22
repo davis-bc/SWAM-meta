@@ -4,14 +4,39 @@ import pandas as pd
 import re
 import csv
 
+# ---------------------------------------------------------------------------
+#   Test-mode path overrides
+#   Activated with:  snakemake --config test=True
+# ---------------------------------------------------------------------------
+
+_TEST = config.get("test", False)
+_REPO = os.path.dirname(os.path.dirname(os.path.dirname(workflow.snakefile)))
+
+if _TEST:
+    input_dir  = os.path.join(_REPO, "test", "data")
+    output_dir = os.path.join(_REPO, "test", "output")
+    # Override all database paths to mini test versions
+    config["scg_db"]      = os.path.join(_REPO, "test", "dbs", "scg", "SCGs_40.fasta")
+    config["uniref50_db"] = os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mmseqs")
+    # GTDB-tk and METABOLIC are skipped in test mode (see Snakefile rule all)
+    config["skip_gtdbtk"]   = True
+    config["skip_metabolic"] = True
+else:
+    # Load config variables
+    input_dir  = config.get("in_dir", "")
+    output_dir = config.get("out_dir", "")
+
+# ---------------------------------------------------------------------------
+#   Resource helper: returns test value when running in test mode
+# ---------------------------------------------------------------------------
+
+def res(production, test=4000):
+    """Return test-mode resource value when config test=True, else production."""
+    return test if _TEST else production
 
 # ----------------------------------------------
 #   Build a mapping from sample R1 and R2 files
 # ----------------------------------------------
-
-# Load config variables
-input_dir = config["in_dir"]
-output_dir = config["out_dir"]
 
 # Helper: extract sample name from fastq filename
 def extract_sample_name(filename):

@@ -1,0 +1,9 @@
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - gtdbtk
+  # After environment creation, set database path:
+  #   conda env config vars set GTDBTK_DATA_PATH=/path/to/gtdbtk_db
+  # Or point via config["gtdbtk_db"] and export in the shell rule.

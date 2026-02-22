@@ -1,0 +1,19 @@
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  # METABOLIC dependencies — METABOLIC itself must be installed from GitHub:
+  #   git clone https://github.com/AnantharamanLab/METABOLIC.git
+  # and configured via config["metabolic_dir"]
+  - hmmer
+  - diamond
+  - prodigal
+  - perl
+  - perl-bioperl
+  - parallel
+  - r-base
+  - r-ggplot2
+  - r-reshape2
+  - r-stringr
+  - r-diagram

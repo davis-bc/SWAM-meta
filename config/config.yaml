@@ -1,1 +1,22 @@
 scg_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/SCGs_40_All.fasta"
+
+# Path to the pre-built MMseqs2 UniRef50 taxonomy database prefix.
+# Build with:
+#   mmseqs createdb uniref50.fasta PREFIX
+#   mmseqs createtaxdb PREFIX tmp --ncbi-tax-dump TAXDIR
+#   mmseqs createindex PREFIX tmp --search-type 2
+uniref50_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/uniref50_mmseqs/uniref50_mmseqs"
+
+# Path to the GTDB-tk reference data directory.
+# Download with: download-db.sh /path/to/gtdbtk_db
+gtdbtk_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/gtdbtk_db"
+
+# Path to the METABOLIC installation directory (cloned from GitHub).
+metabolic_dir: "/work/NRSAAMR/Projects/SWAM/meta/METABOLIC"
+
+# Number of geNomad database splits (increase to reduce memory usage).
+genomad_splits: 1
+
+# Set to True to skip GTDB-tk or METABOLIC (requires large reference databases).
+skip_gtdbtk: False
+skip_metabolic: False

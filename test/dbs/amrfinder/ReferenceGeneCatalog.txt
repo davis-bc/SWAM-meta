@@ -1,0 +1,12 @@
+allele	gene_family	product_name	scope	type	subtype	class	subclass	refseq_protein_accession	refseq_nucleotide_accession	genbank_nucleotide_accession
+fakeGene_0	fakeFamily	synthetic_AMR_gene_0	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000000.1	NG_FAKE000000.1	NG_FAKE000000.1
+fakeGene_1	fakeFamily	synthetic_AMR_gene_1	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000001.1	NG_FAKE000001.1	NG_FAKE000001.1
+fakeGene_2	fakeFamily	synthetic_AMR_gene_2	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000002.1	NG_FAKE000002.1	NG_FAKE000002.1
+fakeGene_3	fakeFamily	synthetic_AMR_gene_3	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000003.1	NG_FAKE000003.1	NG_FAKE000003.1
+fakeGene_4	fakeFamily	synthetic_AMR_gene_4	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000004.1	NG_FAKE000004.1	NG_FAKE000004.1
+fakeGene_5	fakeFamily	synthetic_AMR_gene_5	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000005.1	NG_FAKE000005.1	NG_FAKE000005.1
+fakeGene_6	fakeFamily	synthetic_AMR_gene_6	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000006.1	NG_FAKE000006.1	NG_FAKE000006.1
+fakeGene_7	fakeFamily	synthetic_AMR_gene_7	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000007.1	NG_FAKE000007.1	NG_FAKE000007.1
+fakeGene_8	fakeFamily	synthetic_AMR_gene_8	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000008.1	NG_FAKE000008.1	NG_FAKE000008.1
+fakeGene_9	fakeFamily	synthetic_AMR_gene_9	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000009.1	NG_FAKE000009.1	NG_FAKE000009.1
+blaTEM-1	blaTEM	broad-spectrum_class_A_beta-lactamase_TEM-1	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_000027057.1	NG_050145.1	NG_050145.1

@@ -6,3 +6,11 @@ dbs/**
 .snakemake
 run_snakemake.sh
 short_reads_processing_test.R
+Rplots.pdf
+test/output/**
+test/dbs/uniref50/uniref50_mmseqs
+test/dbs/uniref50/uniref50_mmseqs.*
+test/dbs/uniref50/uniref50_mmseqs_h
+test/dbs/uniref50/uniref50_mmseqs_h.*
+test/dbs/uniref50/uniref50_mmseqs_mapping
+test/dbs/uniref50/uniref50_mmseqs_taxonomy

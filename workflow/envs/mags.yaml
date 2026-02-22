@@ -1,0 +1,13 @@
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - metabat2
+  - coverm
+  - ncbi-amrfinderplus
+  - minimap2
+  - samtools
+  - prodigal
+  - pandas
+  - python >=3.9

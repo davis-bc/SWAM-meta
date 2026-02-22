@@ -115,7 +115,7 @@ catalog_long <- afp_metadata %>%
 afp <- do.call(bind_rows, lapply(afp_files, function(f) {
   x <- tryCatch(read_tsv(f, col_types = cols()),
                 error=function(e) NULL)
-  if (is.null(x)) return(NULL)
+  if (is.null(x) || nrow(x) == 0) return(NULL)
   x$sample <- sub(".afp.res", "", basename(f))
   x <- x %>% relocate(sample)
   x <- x %>% separate(`#Template`, into=c("GI", "refseq_protein_accession", "refseq_nucleotide_accession",
@@ -128,7 +128,7 @@ afp <- do.call(bind_rows, lapply(afp_files, function(f) {
 scg <- do.call(bind_rows, lapply(scgs, function(f) {
   x <- tryCatch(read.table(f),
                 error=function(e) NULL)
-  if (is.null(x)) return(NULL)
+  if (is.null(x) || nrow(x) == 0) return(NULL)
   colnames(x) <- c("qseqid", "sseqid", "pident", "length", "evalue", "bitscore", "slen")
   x$sample <- sub(".scgs", "", basename(f))
   x <- x %>% relocate(sample)
@@ -136,22 +136,35 @@ scg <- do.call(bind_rows, lapply(scgs, function(f) {
 }))
 
 # estimate genome counts as average coverage depth of 40 SCGs
-genome.counts <- scg %>% 
-                group_by(sample) %>% 
-                distinct(qseqid, .keep_all = T) %>% 
-                summarise(n_genomes = sum(length/slen)/40)
+if (!is.null(scg) && nrow(scg) > 0 && "sample" %in% colnames(scg)) {
+  genome.counts <- scg %>% 
+                  group_by(sample) %>% 
+                  distinct(qseqid, .keep_all = T) %>% 
+                  summarise(n_genomes = sum(length/slen)/40)
+} else {
+  # No SCG hits: assign 1 genome per sample as fallback
+  genome.counts <- tibble(sample = sub(".scgs", "", basename(scgs)), n_genomes = 1)
+}
 
 # estimate copies per genome (cpg) as gene coverage depth / estimated genome counts
-afp_long <-  afp %>% 
-                  left_join(genome.counts, by="sample") %>% 
-                  left_join(fastp_summary %>% select(sample, avg_read_length), by="sample") %>%
-                  mutate(read_count = round(Depth * Template_length / avg_read_length),
-                         cpg = Depth / n_genomes) %>%
-                  filter(read_count >= 1) %>% 
-                  left_join(catalog_long, by=c("refseq_nucleotide_accession" = "key")) %>%
-                  mutate(allele_pass = ifelse(Template_Identity >= 80 & Query_Identity >= 99 & !is.na(allele), "yes", "no")) %>%
-                  select(sample, read_count, Depth, cpg, allele, allele_pass, gene_family, product_name, 
-                         scope, type, subtype, class, subclass, refseq_nucleotide_accession) 
+if (!is.null(afp) && nrow(afp) > 0) {
+  afp_long <-  afp %>% 
+                    left_join(genome.counts, by="sample") %>% 
+                    left_join(fastp_summary %>% select(sample, avg_read_length), by="sample") %>%
+                    mutate(read_count = round(Depth * Template_length / avg_read_length),
+                           cpg = Depth / n_genomes) %>%
+                    filter(read_count >= 1) %>% 
+                    left_join(catalog_long, by=c("refseq_nucleotide_accession" = "key")) %>%
+                    mutate(allele_pass = ifelse(Template_Identity >= 80 & Query_Identity >= 99 & !is.na(allele), "yes", "no")) %>%
+                    select(sample, read_count, Depth, cpg, allele, allele_pass, gene_family, product_name, 
+                           scope, type, subtype, class, subclass, refseq_nucleotide_accession)
+} else {
+  afp_long <- tibble(sample=character(), read_count=integer(), Depth=double(), cpg=double(),
+                     allele=character(), allele_pass=character(), gene_family=character(),
+                     product_name=character(), scope=character(), type=character(),
+                     subtype=character(), class=character(), subclass=character(),
+                     refseq_nucleotide_accession=character())
+}
 
 
 ###############################################
