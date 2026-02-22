@@ -14,9 +14,16 @@ gtdbtk_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/gtdbtk_db"
 # Path to the METABOLIC installation directory (cloned from GitHub).
 metabolic_dir: "/work/NRSAAMR/Projects/SWAM/meta/METABOLIC"
 
+# Path to the CheckM2 diamond database file.
+# Download with: checkm2 database --download --path /path/to/checkm2_db
+checkm2_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/checkm2_db/CheckM2_database/uniref100.KO.1.dmnd"
+
 # Number of geNomad database splits (increase to reduce memory usage).
 genomad_splits: 1
 
 # Set to True to skip GTDB-tk or METABOLIC (requires large reference databases).
 skip_gtdbtk: False
 skip_metabolic: False
+
+# Set to True to skip CheckM2 MAG quality assessment (requires checkm2_db).
+skip_checkm2: False

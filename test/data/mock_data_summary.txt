@@ -1,0 +1,89 @@
+SWAM-meta mock dataset v2 — generation summary
+============================================================
+
+Reference genome source
+-----------------------
+  /home/benda/Projects/databases/test-genomes
+
+Genome sizes
+------------
+  ecoli           Escherichia coli 2024GO-0438
+               Accession: GCA_042156675.1
+               5,175,654 bp  |  198 contigs  |  chromosome + plasmid contigs (plasmid replication genes in GFF)
+
+  efaecalis       Enterococcus faecalis ST6
+               Accession: GCA_015304995.1
+               3,313,510 bp  |  89 contigs  |  chromosome + plasmid contigs (MobC mobilization proteins in GFF)
+
+  salmonella      Salmonella enterica ENWS000537-005
+               Accession: GCA_052022995.1
+               4,705,311 bp  |  43 contigs  |  chromosome + plasmid contigs (RepB replication genes in GFF)
+
+  campylobacter   Campylobacter coli 18QD2YX31C
+               Accession: GCF_013072625.1
+               1,939,122 bp  |  5 contigs  |  chromosome + plasmid contigs (RepL replication genes in GFF)
+
+  carjivirus      Carjivirus communis (phage)
+               Accession: GCF_009734245.1
+               97,065 bp  |  1 contigs  |  complete phage genome
+
+  influenza       Influenza A H3N2 A/USA/PV00499/2017
+               Accession: GCA_038998445.1
+               13,628 bp  |  8 contigs  |  8 segments (RNA virus)
+
+Sample compositions and read simulation
+----------------------------------------
+  Tool: wgsim
+  Read length: 150 bp (paired-end)
+  Fragment size: 400 bp outer distance (SD 40 bp)
+  Error rate: 0.005
+
+  mock1:
+    ecoli           10x  →  172,521 read pairs
+    efaecalis       10x  →  110,450 read pairs
+    carjivirus      3x  →  970 read pairs
+    influenza       3x  →  200 read pairs
+    TOTAL           284,141 read pairs
+
+  mock2:
+    ecoli           10x  →  172,521 read pairs
+    salmonella      10x  →  156,843 read pairs
+    campylobacter   10x  →  64,637 read pairs
+    carjivirus      3x  →  970 read pairs
+    TOTAL           394,971 read pairs
+
+Overlap between samples
+-----------------------
+  E. coli and Carjivirus appear in both mock1 and mock2.
+  This tests CoverM genome-mode abundance mapping across samples.
+
+Expected workflow outcomes
+--------------------------
+  geNomad:        Carjivirus -> virus; E. faecalis/Salmonella/Campylobacter plasmid contigs -> plasmid
+  MetaBAT2 bins:  >= 1 MAG per sample (10x coverage of multi-Mb genomes)
+  CheckM2:        Completeness + contamination estimates per MAG
+  GTDB-tk:        Taxonomy for bacterial MAGs (requires large DB; skipped in test mode)
+  KMA/AMRFinder:  blaTEM-1 detected in short reads and contig AMR (embedded in E. coli first contig)
+  DIAMOND SCGs:   40 synthetic CDSes embedded in E. coli first contig -> n_genomes > 0
+
+SCG / AMR database embedding
+------------------------------
+  The 40 synthetic SCG CDSes (seed=52, 900 bp each, 300 aa translated) are embedded
+  in the E. coli first contig at positions 5000, 15000, ..., 395000.
+  blaTEM-1 (861 bp) is embedded at position 200000.
+  These are IDENTICAL to the sequences in test/dbs/scg/SCGs_40.fasta and
+  test/dbs/amrfinder/AMR_CDS.fa, so those databases do NOT need to be rebuilt.
+
+Files generated
+---------------
+  test/data/mock1_R1.fastq.gz
+  test/data/mock1_R2.fastq.gz
+  test/data/mock2_R1.fastq.gz
+  test/data/mock2_R2.fastq.gz
+  test/dbs/genomes/ecoli.fa           (modified: SCGs + blaTEM-1 embedded)
+  test/dbs/genomes/efaecalis.fa
+  test/dbs/genomes/salmonella.fa
+  test/dbs/genomes/campylobacter.fa
+  test/dbs/genomes/carjivirus.fa
+  test/dbs/genomes/influenza.fa
+  test/data/mock_data_summary.txt     (this file)

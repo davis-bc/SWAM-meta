@@ -53,6 +53,16 @@ rule bin:
             -t {resources.threads} \
             --seed 42
 
+        # Strip MetaBAT2's tab-separated depth info from bin FASTA headers.
+        # CoverM genome mode matches sequence names from the BAM (which are
+        # truncated at the first whitespace) against FASTA header names.
+        # MetaBAT2 appends "\ttotal_depth=...\tsample_depths=..." to each
+        # header; removing it ensures names match the BAM reference names.
+        for fa in {params.bin_dir}/*.fa; do
+            [ -f "$fa" ] || continue
+            sed -i 's/\t.*//' "$fa"
+        done
+
         # Write an empty bin placeholder if no bins were produced
         # (common with small test assemblies)
         if [ -z "$(ls -A {params.bin_dir})" ]; then
@@ -273,8 +283,46 @@ rule mag_metabolism:
         """
 
 # ---------------------------------------------------------------------------
-#   Per-sample: CoverM abundance (trimmed_mean) for all bins
+#   Per-sample: CheckM2 MAG quality assessment (completeness + contamination)
 # ---------------------------------------------------------------------------
+
+rule mag_qc:
+    input:
+        done = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done")
+    output:
+        tsv  = os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv")
+    params:
+        bin_dir = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
+        out_dir = os.path.join(output_dir, "data", "bins", "{sample}", "checkm2"),
+        db_path = config.get("checkm2_db", ""),
+        skip    = config.get("skip_checkm2", False)
+    resources:
+        mem_mb  = lambda wc: res(32000, 4000),
+        threads = lambda wc: res(16, 4),
+        time    = "0-08:00:00"
+    conda: "../envs/checkm2.yaml"
+    shell:
+        """
+        if [ "{params.skip}" = "True" ]; then
+            echo "CheckM2 skipped (skip_checkm2=True)" >&2
+            printf "Name\\tCompleteness\\tContamination\\n" > {output.tsv}
+        else
+            n_bins=$(find {params.bin_dir} -name "*.fa" 2>/dev/null | wc -l)
+            if [ "$n_bins" -eq 0 ]; then
+                printf "Name\\tCompleteness\\tContamination\\n" > {output.tsv}
+            else
+                mkdir -p {params.out_dir}
+                checkm2 predict \
+                    --input {params.bin_dir} \
+                    --output-directory {params.out_dir} \
+                    --database_path {params.db_path} \
+                    --threads {resources.threads} \
+                    -x fa
+                cp {params.out_dir}/quality_report.tsv {output.tsv}
+            fi
+        fi
+        """
+
 
 rule mag_abundance:
     input:

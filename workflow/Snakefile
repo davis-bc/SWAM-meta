@@ -64,6 +64,11 @@ def all_targets(wildcards):
             os.path.join(output_dir, "data", "bins", "{sample}", ".metabolic.done"),
             sample=samples
         )
+    if not config.get("skip_checkm2", False):
+        targets += expand(
+            os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv"),
+            sample=samples
+        )
 
     return targets
 

@@ -19,8 +19,9 @@ if _TEST:
     config["scg_db"]      = os.path.join(_REPO, "test", "dbs", "scg", "SCGs_40.fasta")
     config["uniref50_db"] = os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mmseqs")
     # GTDB-tk and METABOLIC are skipped in test mode (see Snakefile rule all)
-    config["skip_gtdbtk"]   = True
+    config["skip_gtdbtk"]    = True
     config["skip_metabolic"] = True
+    config["skip_checkm2"]   = True
 else:
     # Load config variables
     input_dir  = config.get("in_dir", "")
