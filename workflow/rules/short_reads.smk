@@ -166,7 +166,7 @@ rule short_reads_summary:
     output:
         fastp       = os.path.join(output_dir, "fastp_summary.csv"),
         afp         = os.path.join(output_dir, "short_reads_output.csv"),
-        amr_summary = os.path.join(output_dir, "AMR_abundance_summary.csv")
+        amr_summary = os.path.join(output_dir, "markers_cpg.csv")
     conda: "../envs/Renv.yaml"
     script:
         "../scripts/short_reads_processing.R"   

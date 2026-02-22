@@ -123,10 +123,21 @@ def parse_mge(mge_path):
     """
     Parse MobileElementFinder output.
 
-    Expected columns (MobileElementFinder ≥ 2.x):
-      sequence, pos_from, pos_to, strand, element_symbol, ...
+    Observed format (mge_finder ≥ 1.1):
+      CSV file with leading comment lines starting with '#'.
+      Columns: mge_no, name, synonyms, prediction, type, allele_len, depth,
+               e_value, identity, coverage, gaps, substitution, contig, start, end, cigar
+
+    The 'contig' column often contains extra metadata after the first space
+    (e.g. "mock1-k127_19 flag=1 multi=7.0000 len=5958"); only the first
+    space-delimited token is the actual contig identifier.
     """
-    df = safe_read(mge_path)
+    if not os.path.exists(mge_path) or os.path.getsize(mge_path) == 0:
+        return []
+    try:
+        df = pd.read_csv(mge_path, sep=",", comment="#", dtype=str)
+    except Exception:
+        return []
     if df.empty:
         return []
 
@@ -138,16 +149,19 @@ def parse_mge(mge_path):
                 return cols_lower[c]
         return None
 
-    seq_col    = gcol("sequence", "contig", "seqid", "#sequence")
-    name_col   = gcol("element_symbol", "name", "type", "element")
-    start_col  = gcol("pos_from", "start", "pos_start")
-    stop_col   = gcol("pos_to",   "stop",  "pos_end")
+    seq_col    = gcol("contig", "sequence", "seqid", "#sequence")
+    name_col   = gcol("name", "element_symbol", "type", "element")
+    start_col  = gcol("start", "pos_from", "pos_start")
+    stop_col   = gcol("end", "pos_to", "stop", "pos_end")
     strand_col = gcol("strand")
 
     features = []
     for _, row in df.iterrows():
+        # Strip extra content appended after first space in contig column
+        raw_cid = str(row[seq_col]) if seq_col else ""
+        cid = raw_cid.split()[0] if raw_cid else ""
         features.append({
-            "contig_id":    str(row[seq_col])    if seq_col    else "",
+            "contig_id":    cid,
             "feature_type": "MGE",
             "gene":         str(row[name_col])   if name_col   else "",
             "start":        str(row[start_col])  if start_col  else "",

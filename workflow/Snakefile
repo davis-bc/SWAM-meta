@@ -37,7 +37,6 @@ def all_targets(wildcards):
         # Short-read summary
         os.path.join(output_dir, "fastp_summary.csv"),
         os.path.join(output_dir, "short_reads_output.csv"),
-        os.path.join(output_dir, "AMR_abundance_summary.csv"),
         # Assembly
         *expand(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"), sample=samples),
         # geNomad classification
@@ -48,6 +47,7 @@ def all_targets(wildcards):
         os.path.join(output_dir, "contig_summary.tsv"),
         # Unified AMR abundance (short-reads + contigs, cpg-normalised)
         os.path.join(output_dir, "AMR_unified.csv"),
+        os.path.join(output_dir, "AMR_abundance_summary.csv"),
         # MAG binning
         *expand(os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"), sample=samples),
         # MAG AMR + MGE

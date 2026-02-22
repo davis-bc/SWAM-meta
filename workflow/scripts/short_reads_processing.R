@@ -208,17 +208,10 @@ if (!is.null(markers) && nrow(markers) > 0) {
 }
 
 ###############################################
-###   AMR abundance summary
+###   markers cpg output (pBI143 + crAss001)
+###   AMR_abundance_summary.csv is now produced
+###   by amr_unified.py (uses the unified table)
 ###############################################
-
-amr_total <- if (nrow(afp_long) > 0) {
-  afp_long %>%
-    filter(type == "AMR") %>%
-    group_by(sample) %>%
-    summarise(`AMR_total (cpg)` = sum(cpg, na.rm = TRUE), .groups = "drop")
-} else {
-  tibble(sample = character(), `AMR_total (cpg)` = double())
-}
 
 pbi143_cpg <- marker_cpg %>%
   filter(seq_id == "U30316.1") %>%
@@ -228,16 +221,14 @@ crass_cpg <- marker_cpg %>%
   filter(seq_id == "NC_049977.1") %>%
   select(sample, `crAss001 (cpg)` = cpg)
 
-amr_abundance <- tibble(sample = unique(fastp_summary$sample)) %>%
-  left_join(amr_total, by = "sample") %>%
+markers_out <- tibble(sample = unique(fastp_summary$sample)) %>%
   left_join(pbi143_cpg, by = "sample") %>%
   left_join(crass_cpg, by = "sample") %>%
   mutate(
-    `AMR_total (cpg)` = replace_na(`AMR_total (cpg)`, 0),
-    `pBI143 (cpg)`    = replace_na(`pBI143 (cpg)`, 0),
-    `crAss001 (cpg)`  = replace_na(`crAss001 (cpg)`, 0)
+    `pBI143 (cpg)`  = replace_na(`pBI143 (cpg)`, 0),
+    `crAss001 (cpg)` = replace_na(`crAss001 (cpg)`, 0)
   )
 
-write.csv(amr_abundance, out_file3, row.names = FALSE)
+write.csv(markers_out, out_file3, row.names = FALSE)
 
 

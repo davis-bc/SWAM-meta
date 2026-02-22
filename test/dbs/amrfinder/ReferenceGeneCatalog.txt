@@ -10,3 +10,52 @@ fakeGene_7	fakeFamily	synthetic_AMR_gene_7	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_F
 fakeGene_8	fakeFamily	synthetic_AMR_gene_8	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000008.1	NG_FAKE000008.1	NG_FAKE000008.1
 fakeGene_9	fakeFamily	synthetic_AMR_gene_9	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_FAKE000009.1	NG_FAKE000009.1	NG_FAKE000009.1
 blaTEM-1	blaTEM	broad-spectrum_class_A_beta-lactamase_TEM-1	core	AMR	AMR	BETA-LACTAM	CLASS_A	WP_000027057.1	NG_050145.1	NG_050145.1
+aac(3)-IVa	aac(3)-IVa	aminoglycoside N-acetyltransferase AAC(3)-IVa	core	AMR	AMR	AMINOGLYCOSIDE	APRAMYCIN/GENTAMICIN/TOBRAMYCIN	WP_001199192.1	NG_MOCK_aac_3__IVa	NG_MOCK_aac_3__IVa
+aac(6')-Ie/aph(2'')-Ia	aac(6')-Ie/aph(2'')-Ia	bifunctional aminoglycoside N-acetyltransferase AAC(6')-Ie/aminoglycoside O-phosphotransferase APH(2'')-Ia	core	AMR	AMR	AMINOGLYCOSIDE	AMIKACIN/GENTAMICIN/KANAMYCIN/TOBRAMYCIN	WP_001028144.1	NG_MOCK_aac_6___Ie_aph_2____Ia	NG_MOCK_aac_6___Ie_aph_2____Ia
+aad9	aad9	ANT(9) family aminoglycoside nucleotidyltransferase	core	AMR	AMR	AMINOGLYCOSIDE	AMINOGLYCOSIDE	WP_002578722.1	NG_MOCK_aad9	NG_MOCK_aad9
+aadA1	aadA1	ANT(3'')-Ia family aminoglycoside nucleotidyltransferase AadA1	core	AMR	AMR	AMINOGLYCOSIDE	STREPTOMYCIN	WP_001209508.1	NG_MOCK_aadA1	NG_MOCK_aadA1
+aadA2	aadA2	ANT(3'')-Ia family aminoglycoside nucleotidyltransferase AadA2	core	AMR	AMR	AMINOGLYCOSIDE	STREPTOMYCIN	WP_001261740.1	NG_MOCK_aadA2	NG_MOCK_aadA2
+aadD1	aadD1	aminoglycoside O-nucleotidyltransferase ANT(4')-Ia	core	AMR	AMR	AMINOGLYCOSIDE	KANAMYCIN/TOBRAMYCIN	WP_001014230.1	NG_MOCK_aadD1	NG_MOCK_aadD1
+aadE	aadE	aminoglycoside 6-adenylyltransferase AadE	core	AMR	AMR	AMINOGLYCOSIDE	STREPTOMYCIN	WP_001255868.1	NG_MOCK_aadE	NG_MOCK_aadE
+ant(6)-Ia	ant(6)-Ia	aminoglycoside nucleotidyltransferase ANT(6)-Ia	core	AMR	AMR	AMINOGLYCOSIDE	STREPTOMYCIN	WP_001255866.1	NG_MOCK_ant_6__Ia	NG_MOCK_ant_6__Ia
+aph(3'')-Ib	aph(3'')-Ib	aminoglycoside O-phosphotransferase APH(3'')-Ib	core	AMR	AMR	AMINOGLYCOSIDE	STREPTOMYCIN	WP_001082319.1	NG_MOCK_aph_3____Ib	NG_MOCK_aph_3____Ib
+aph(3')-IIIa	aph(3')-IIIa	aminoglycoside O-phosphotransferase APH(3')-IIIa	core	AMR	AMR	AMINOGLYCOSIDE	AMIKACIN/KANAMYCIN	WP_001096887.1	NG_MOCK_aph_3___IIIa	NG_MOCK_aph_3___IIIa
+aph(3')-IIa	aph(3')-IIa	aminoglycoside O-phosphotransferase APH(3')-IIa	core	AMR	AMR	AMINOGLYCOSIDE	KANAMYCIN	WP_000572405.1	NG_MOCK_aph_3___IIa	NG_MOCK_aph_3___IIa
+aph(3')-Ia	aph(3')-Ia	aminoglycoside O-phosphotransferase APH(3')-Ia	core	AMR	AMR	AMINOGLYCOSIDE	KANAMYCIN	WP_000018321.1	NG_MOCK_aph_3___Ia	NG_MOCK_aph_3___Ia
+aph(4)-Ia	aph(4)-Ia	aminoglycoside O-phosphotransferase APH(4)-Ia	core	AMR	AMR	AMINOGLYCOSIDE	HYGROMYCIN	WP_000742814.1	NG_MOCK_aph_4__Ia	NG_MOCK_aph_4__Ia
+aph(6)-Id	aph(6)-Id	aminoglycoside O-phosphotransferase APH(6)-Id	core	AMR	AMR	AMINOGLYCOSIDE	STREPTOMYCIN	WP_000480968.1	NG_MOCK_aph_6__Id	NG_MOCK_aph_6__Id
+blaCTX-M-55	blaCTX-M-55	extended-spectrum class A beta-lactamase CTX-M-55	core	AMR	AMR	BETA-LACTAM	CEPHALOSPORIN	WP_015387340.1	NG_MOCK_blaCTX_M_55	NG_MOCK_blaCTX_M_55
+blaNDM-5	blaNDM-5	subclass B1 metallo-beta-lactamase NDM-5	core	AMR	AMR	BETA-LACTAM	CARBAPENEM	WP_023408309.1	NG_MOCK_blaNDM_5	NG_MOCK_blaNDM_5
+blaOXA-10	blaOXA-10	oxacillin-hydrolyzing class D beta-lactamase OXA-10	core	AMR	AMR	BETA-LACTAM	CEPHALOSPORIN	WP_000846390.1	NG_MOCK_blaOXA_10	NG_MOCK_blaOXA_10
+blaOXA-193	blaOXA-193	OXA-61 family class D beta-lactamase OXA-193	core	AMR	AMR	BETA-LACTAM	BETA-LACTAM	WP_002783228.1	NG_MOCK_blaOXA_193	NG_MOCK_blaOXA_193
+ble	ble	bleomycin binding protein Ble-MBL	core	AMR	AMR	BLEOMYCIN	BLEOMYCIN	WP_004201167.1	NG_MOCK_ble	NG_MOCK_ble
+bleO	bleO	bleomycin binding protein	core	AMR	AMR	BLEOMYCIN	BLEOMYCIN	WP_001242578.1	NG_MOCK_bleO	NG_MOCK_bleO
+catA	catA	type A-9 chloramphenicol O-acetyltransferase	core	AMR	AMR	PHENICOL	CHLORAMPHENICOL	WP_001010387.1	NG_MOCK_catA	NG_MOCK_catA
+catA13	catA13	type A-13 chloramphenicol O-acetyltransferase	core	AMR	AMR	PHENICOL	CHLORAMPHENICOL	WP_040564913.1	NG_MOCK_catA13	NG_MOCK_catA13
+cmlA1	cmlA1	chloramphenicol efflux MFS transporter CmlA1	core	AMR	AMR	PHENICOL	CHLORAMPHENICOL	WP_000095725.1	NG_MOCK_cmlA1	NG_MOCK_cmlA1
+cmlA5	cmlA5	chloramphenicol efflux MFS transporter CmlA5	core	AMR	AMR	PHENICOL	CHLORAMPHENICOL	WP_012300772.1	NG_MOCK_cmlA5	NG_MOCK_cmlA5
+dfrF	dfrF	trimethoprim-resistant dihydrofolate reductase DfrF	core	AMR	AMR	TRIMETHOPRIM	TRIMETHOPRIM	WP_002322211.1	NG_MOCK_dfrF	NG_MOCK_dfrF
+erm(A)	erm(A)	23S rRNA (adenine(2058)-N(6))-methyltransferase Erm(A)	core	AMR	AMR	LINCOSAMIDE/MACROLIDE	AZITHROMYCIN/CLARITHROMYCIN/CLINDAMYCIN/ERYTHROMYCIN/TELITHROMYCIN	WP_001072201.1	NG_MOCK_erm_A_	NG_MOCK_erm_A_
+erm(B)	erm(B)	23S rRNA (adenine(2058)-N(6))-methyltransferase Erm(B)	core	AMR	AMR	LINCOSAMIDE/MACROLIDE/STREPTOGRAMIN	CLINDAMYCIN/ERYTHROMYCIN/STREPTOGRAMIN B	WP_001038795.1	NG_MOCK_erm_B_	NG_MOCK_erm_B_
+estX-3	estX-3	macrolide esterase EstX-3	core	AMR	AMR	MACROLIDE	TYLOSIN	WP_001456218.1	NG_MOCK_estX_3	NG_MOCK_estX_3
+floR	floR	chloramphenicol/florfenicol efflux MFS transporter FloR	core	AMR	AMR	PHENICOL	CHLORAMPHENICOL/FLORFENICOL	WP_000214121.1	NG_MOCK_floR	NG_MOCK_floR
+fosA3	fosA3	fosfomycin resistance glutathione transferase FosA3	core	AMR	AMR	FOSFOMYCIN	FOSFOMYCIN	WP_014839980.1	NG_MOCK_fosA3	NG_MOCK_fosA3
+lnu(F)	lnu(F)	lincosamide nucleotidyltransferase Lnu(F)	core	AMR	AMR	LINCOSAMIDE	LINCOSAMIDE	WP_000939727.1	NG_MOCK_lnu_F_	NG_MOCK_lnu_F_
+lsa(A)	lsa(A)	ABC-F type ribosomal protection protein Lsa(A)	core	AMR	AMR	LINCOSAMIDE/STREPTOGRAMIN	LINCOSAMIDE/STREPTOGRAMIN	WP_002387187.1	NG_MOCK_lsa_A_	NG_MOCK_lsa_A_
+mph(A)	mph(A)	Mph(A) family macrolide 2'-phosphotransferase	core	AMR	AMR	MACROLIDE	AZITHROMYCIN/ERYTHROMYCIN/SPIRAMYCIN/TELITHROMYCIN	WP_000219391.1	NG_MOCK_mph_A_	NG_MOCK_mph_A_
+mrx(A)	mrx(A)	phosphorylated macrolide efflux MFS transporter Mrx(A)	core	AMR	AMR	MACROLIDE	AZITHROMYCIN/ERYTHROMYCIN/SPIRAMYCIN/TELITHROMYCIN	WP_000004159.1	NG_MOCK_mrx_A_	NG_MOCK_mrx_A_
+optrA	optrA	ABC-F type ribosomal protection protein OptrA	core	AMR	AMR	OXAZOLIDINONE/PHENICOL	FLORFENICOL/OXAZOLIDINONE	WP_063854496.1	NG_MOCK_optrA	NG_MOCK_optrA
+qacL	qacL	quaternary ammonium compound efflux SMR transporter QacL	core	STRESS	BIOCIDE	QUATERNARY AMMONIUM	QUATERNARY AMMONIUM	WP_000800531.1	NG_MOCK_qacL	NG_MOCK_qacL
+qnrS1	qnrS1	quinolone resistance pentapeptide repeat protein QnrS1	core	AMR	AMR	QUINOLONE	QUINOLONE	WP_001516695.1	NG_MOCK_qnrS1	NG_MOCK_qnrS1
+sat4	sat4	streptothricin N-acetyltransferase Sat4	core	AMR	AMR	STREPTOTHRICIN	STREPTOTHRICIN	WP_000627290.1	NG_MOCK_sat4	NG_MOCK_sat4
+sul3	sul3	sulfonamide-resistant dihydropteroate synthase Sul3	core	AMR	AMR	SULFONAMIDE	SULFONAMIDE	WP_000034420.1	NG_MOCK_sul3	NG_MOCK_sul3
+tet(A)	tet(A)	tetracycline efflux MFS transporter Tet(A)	core	AMR	AMR	TETRACYCLINE	TETRACYCLINE	WP_000804064.1	NG_MOCK_tet_A_	NG_MOCK_tet_A_
+tet(L)	tet(L)	tetracycline efflux MFS transporter Tet(L)	core	AMR	AMR	TETRACYCLINE	TETRACYCLINE	WP_002294500.1	NG_MOCK_tet_L_	NG_MOCK_tet_L_
+tet(M)	tet(M)	tetracycline resistance ribosomal protection protein Tet(M)	core	AMR	AMR	TETRACYCLINE	TETRACYCLINE	WP_063856397.1	NG_MOCK_tet_M_	NG_MOCK_tet_M_
+vanA	vanA	D-alanine--(R)-lactate ligase VanA	core	AMR	AMR	GLYCOPEPTIDE	VANCOMYCIN	WP_001079845.1	NG_MOCK_vanA	NG_MOCK_vanA
+vanH-A	vanH-A	D-lactate dehydrogenase VanH-A	core	AMR	AMR	GLYCOPEPTIDE	VANCOMYCIN	WP_001059542.1	NG_MOCK_vanH_A	NG_MOCK_vanH_A
+vanR-A	vanR-A	vancomycin resistance response regulator transcription factor VanR-A	core	AMR	AMR	GLYCOPEPTIDE	VANCOMYCIN	WP_001280781.1	NG_MOCK_vanR_A	NG_MOCK_vanR_A
+vanS-A	vanS-A	vancomycin resistance histidine kinase VanS-A	core	AMR	AMR	GLYCOPEPTIDE	VANCOMYCIN	WP_002305818.1	NG_MOCK_vanS_A	NG_MOCK_vanS_A
+vanX-A	vanX-A	D-Ala-D-Ala dipeptidase VanX-A	core	AMR	AMR	GLYCOPEPTIDE	VANCOMYCIN	WP_000402347.1	NG_MOCK_vanX_A	NG_MOCK_vanX_A
+vanY-A	vanY-A	D-Ala-D-Ala carboxypeptidase VanY-A	core	AMR	AMR	GLYCOPEPTIDE	VANCOMYCIN	WP_001812592.1	NG_MOCK_vanY_A	NG_MOCK_vanY_A
+vanZ-A	vanZ-A	glycopeptide resistance protein VanZ-A	core	AMR	AMR	GLYCOPEPTIDE	VANCOMYCIN	WP_000516404.1	NG_MOCK_vanZ_A	NG_MOCK_vanZ_A
