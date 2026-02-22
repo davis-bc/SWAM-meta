@@ -146,7 +146,7 @@ rule mag_amr:
                 -g "$gff" \
                 --threads {resources.threads} \
                 --annotation_format prodigal \
-                -o "$TMP_AMR.bin"
+                -o "$TMP_AMR.bin" 2>/dev/null || true
             if [ -s "$TMP_AMR.bin" ]; then
                 if [ $HEADER_WRITTEN -eq 0 ]; then
                     head -1 "$TMP_AMR.bin" > "$TMP_AMR"
