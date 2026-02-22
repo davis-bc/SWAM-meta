@@ -31,6 +31,7 @@ rule contigs:
         r2       = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz")
     output:
         megahit  = protected(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"))
+    threads: lambda wc: res(32, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(32, 4),
@@ -83,6 +84,7 @@ rule genomad:
         vir_summary  = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_virus_summary.tsv")
     params:
         splits = config.get("genomad_splits", 1)
+    threads: lambda wc: res(32, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(32, 4),
@@ -114,6 +116,7 @@ rule mobmess:
         contig_bam   = os.path.join(output_dir, "data", "mobmess", "{sample}.contigs_plasmid.bam"),
         mobmess      = os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt")
     conda: "../envs/contigs.yaml"
+    threads: lambda wc: res(32, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(32, 4),
@@ -212,6 +215,7 @@ rule contig_amr:
         gff     = os.path.join(output_dir, "data", "prodigal", "{sample}.gff")
     output:
         tsv = os.path.join(output_dir, "data", "amr_contigs", "{sample}_contig_amr.tsv")
+    threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
@@ -256,6 +260,7 @@ rule mge_annotation:
     output:
         tsv = os.path.join(output_dir, "data", "mge_contigs", "{sample}_mge.tsv"),
         tmp = temp(directory(os.path.join(output_dir, "data", "mge_contigs", "{sample}_tmp")))
+    threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
@@ -292,6 +297,7 @@ rule mmseqs_taxonomy:
         db_prefix = lambda wc: os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mmseqs")
                     if _TEST else config.get("uniref50_db", ""),
         tmp       = lambda wc: os.path.join(output_dir, "data", "mmseqs", f"{wc.sample}_tmp")
+    threads: lambda wc: res(32, 4)
     resources:
         mem_mb  = lambda wc: res(64000, 4000),
         threads = lambda wc: res(32, 4),
@@ -331,6 +337,7 @@ rule contig_abundance:
         bam = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam"),
         bai = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam.bai"),
         tsv = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contig_abundance.tsv")
+    threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(20000, 4000),
         threads = lambda wc: res(16, 4),

@@ -7,13 +7,16 @@ rule initiate_dbs:
         afp_db       = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
         scg_db       = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt"),
         afp_metadata = os.path.join(output_dir, "data", "alignments", "dbs", "ReferenceGeneCatalog.txt"),
-        h_genome     = os.path.join(output_dir, "data", "alignments", "dbs", "GCF_000001405.40_GRCh38.p14_genomic.fna.gz")
+        h_genome     = os.path.join(output_dir, "data", "alignments", "dbs", "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        markers_db   = os.path.join(output_dir, "data", "alignments", "dbs", ".markers.done.txt")
     params:
-        scg_db       = config["scg_db"],
-        test_mode    = _TEST,
-        test_amr_fa  = os.path.join(_REPO, "test", "dbs", "amrfinder", "AMR_CDS.fa"),
-        test_meta    = os.path.join(_REPO, "test", "dbs", "amrfinder", "ReferenceGeneCatalog.txt"),
-        test_human   = os.path.join(_REPO, "test", "dbs", "human", "human_mini.fna.gz"),
+        scg_db           = config["scg_db"],
+        test_mode        = _TEST,
+        test_amr_fa      = os.path.join(_REPO, "test", "dbs", "amrfinder", "AMR_CDS.fa"),
+        test_meta        = os.path.join(_REPO, "test", "dbs", "amrfinder", "ReferenceGeneCatalog.txt"),
+        test_human       = os.path.join(_REPO, "test", "dbs", "human", "human_mini.fna.gz"),
+        test_markers_dir = os.path.join(_REPO, "test", "dbs", "markers"),
+        markers_dir      = config.get("markers_db", ""),
     conda: "../envs/shortreads.yaml"
     shell:
         """
@@ -35,6 +38,12 @@ rule initiate_dbs:
 
             cp {params.test_human} {output.h_genome}
 
+            cat {params.test_markers_dir}/pBI143.fasta {params.test_markers_dir}/crAss001.fasta \
+                > $(dirname {output.afp_db})/markers.fa
+            kma index -i $(dirname {output.afp_db})/markers.fa \
+                      -o $(dirname {output.afp_db})/markers_db > /dev/null 2>&1
+            touch {output.markers_db}
+
         else
 
             # Production: download latest AMRFinderPlus database and metadata
@@ -55,6 +64,13 @@ rule initiate_dbs:
             echo "downloading human reference genome for host filtering"
             wget -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz > /dev/null 2>&1
 
+            echo "building KMA index for anthropogenic markers (pBI143, crAss001)"
+            cat {params.markers_dir}/pBI143.fasta {params.markers_dir}/crAss001.fasta \
+                > $(dirname {output.afp_db})/markers.fa
+            kma index -i $(dirname {output.afp_db})/markers.fa \
+                      -o $(dirname {output.afp_db})/markers_db > /dev/null 2>&1
+            touch {output.markers_db}
+
         fi
         """
 
@@ -68,14 +84,17 @@ rule short_reads:
         r2          = get_r2,
         afp_db      = os.path.join(output_dir, "data", "alignments", "dbs", ".indexing.done.txt"),
         scg_db      = os.path.join(output_dir, "data", "alignments", "dbs", ".dmnd.done.txt"),
-        h_genome    = os.path.join(output_dir, "data", "alignments", "dbs", "GCF_000001405.40_GRCh38.p14_genomic.fna.gz")
+        h_genome    = os.path.join(output_dir, "data", "alignments", "dbs", "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        markers_db  = os.path.join(output_dir, "data", "alignments", "dbs", ".markers.done.txt")
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
         r1_clean    = protected(os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz")),
         r2_clean    = protected(os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz")),
         nonpareil   = protected(os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.npo")),
         afp         = os.path.join(output_dir, "data", "alignments", "{sample}.afp.res"),
-        scgs        = os.path.join(output_dir, "data", "alignments", "{sample}.scgs")
+        scgs        = os.path.join(output_dir, "data", "alignments", "{sample}.scgs"),
+        markers     = os.path.join(output_dir, "data", "alignments", "{sample}.markers.res")
+    threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(20000, 4000),
         threads = lambda wc: res(16, 4),
@@ -108,6 +127,10 @@ rule short_reads:
         echo "aligning reads to AMRFinderPlus with KMA"
         kma -ipe {output.r1_clean} {output.r2_clean} -o $(dirname {output.afp})/{wildcards.sample}.afp -t_db $(dirname {input.afp_db})/afp_db -1t1 -t {resources.threads}
         
+        # run KMA against anthropogenic markers (pBI143, crAss001)
+        echo "aligning reads to anthropogenic markers with KMA"
+        kma -ipe {output.r1_clean} {output.r2_clean} -o $(dirname {output.markers})/{wildcards.sample}.markers -t_db $(dirname {input.markers_db})/markers_db -1t1 -t {resources.threads}
+        
         # Run diamond against single-copy genes using a concat temp file
         echo "aligning reads to single copy genes with diamond"
         TMP_SE="$TMPDIR/{wildcards.sample}_SE.fastq.gz"
@@ -138,10 +161,12 @@ rule short_reads_summary:
         scgs            = expand(os.path.join(output_dir, "data", "alignments", "{sample}.scgs"), sample=samples),
         npos            = expand(os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.npo"), sample=samples),
         jsons           = expand(os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"), sample=samples),
-        afp_metadata    = os.path.join(output_dir, "data", "alignments", "dbs", "ReferenceGeneCatalog.txt")
+        afp_metadata    = os.path.join(output_dir, "data", "alignments", "dbs", "ReferenceGeneCatalog.txt"),
+        markers_files   = expand(os.path.join(output_dir, "data", "alignments", "{sample}.markers.res"), sample=samples)
     output:
-        fastp   = os.path.join(output_dir, "fastp_summary.csv"),
-        afp     = os.path.join(output_dir, "short_reads_output.csv")
+        fastp       = os.path.join(output_dir, "fastp_summary.csv"),
+        afp         = os.path.join(output_dir, "short_reads_output.csv"),
+        amr_summary = os.path.join(output_dir, "AMR_abundance_summary.csv")
     conda: "../envs/Renv.yaml"
     script:
         "../scripts/short_reads_processing.R"   

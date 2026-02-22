@@ -29,6 +29,7 @@ rule bin:
         bin_dir    = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
         min_contig = lambda wc: res(2500, 1500),
         min_cls    = lambda wc: res(200000, 50000)
+    threads: lambda wc: res(32, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 6000),
         threads = lambda wc: res(32, 4),
@@ -122,6 +123,7 @@ rule mag_amr:
     params:
         bin_dir = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
         prd_dir = os.path.join(output_dir, "data", "bins", "{sample}", "prodigal")
+    threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
@@ -170,6 +172,7 @@ rule mag_mge:
     params:
         bin_dir = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
         tmp_dir = os.path.join(output_dir, "data", "bins", "{sample}", "mge_tmp")
+    threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
@@ -218,6 +221,7 @@ rule mag_taxonomy:
         out_dir  = os.path.join(output_dir, "data", "bins", "{sample}", "gtdbtk"),
         gtdb_db  = config.get("gtdbtk_db", ""),
         skip     = config.get("skip_gtdbtk", False)
+    threads: lambda wc: res(64, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(64, 4),
@@ -262,6 +266,7 @@ rule mag_metabolism:
         out_dir      = os.path.join(output_dir, "data", "bins", "{sample}", "metabolic"),
         metabolic_dir = config.get("metabolic_dir", ""),
         skip         = config.get("skip_metabolic", False)
+    threads: lambda wc: res(64, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(64, 4),
@@ -296,6 +301,7 @@ rule mag_qc:
         out_dir = os.path.join(output_dir, "data", "bins", "{sample}", "checkm2"),
         db_path = config.get("checkm2_db", ""),
         skip    = config.get("skip_checkm2", False)
+    threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
@@ -334,6 +340,7 @@ rule mag_abundance:
         tsv = os.path.join(output_dir, "data", "bins", "{sample}", "mag_abundance.tsv")
     params:
         bin_dir = os.path.join(output_dir, "data", "bins", "{sample}", "bins")
+    threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
