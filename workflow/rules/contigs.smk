@@ -30,7 +30,7 @@ rule contigs:
         r1       = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
         r2       = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz")
     output:
-        megahit  = protected(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"))
+        megahit  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa")
     threads: lambda wc: res(32, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 8000),

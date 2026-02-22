@@ -88,9 +88,9 @@ rule short_reads:
         markers_db  = os.path.join(output_dir, "data", "alignments", "dbs", ".markers.done.txt")
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
-        r1_clean    = protected(os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz")),
-        r2_clean    = protected(os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz")),
-        nonpareil   = protected(os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.npo")),
+        r1_clean    = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
+        r2_clean    = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz"),
+        nonpareil   = os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.npo"),
         afp         = os.path.join(output_dir, "data", "alignments", "{sample}.afp.res"),
         scgs        = os.path.join(output_dir, "data", "alignments", "{sample}.scgs"),
         markers     = os.path.join(output_dir, "data", "alignments", "{sample}.markers.res")
