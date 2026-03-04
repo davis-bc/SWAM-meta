@@ -14,3 +14,8 @@ test/dbs/uniref50/uniref50_mmseqs_h
 test/dbs/uniref50/uniref50_mmseqs_h.*
 test/dbs/uniref50/uniref50_mmseqs_mapping
 test/dbs/uniref50/uniref50_mmseqs_taxonomy
+test/dbs/amrfinder/afp_db*
+test/dbs/markers/markers_db*
+test/dbs/markers/markers.fa
+test/dbs/scg/scg_db.dmnd
+.github/copilot-instructions.md
