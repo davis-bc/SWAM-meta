@@ -198,3 +198,41 @@ All 31 jobs pass in test mode. Terminal outputs:
 ### Known issues / next steps
 - `gene_family` in `AMR_unified.csv` uses the gene symbol itself (not a gene family grouping) for contig-detected genes, since AMRFinder direct output doesn't provide a gene_family column. Production runs with the full catalog will populate this correctly for known alleles.
 - `short_reads_only` evidence is rare in test data (3 genes: cmlA1 and 2 others in mock2) because the test reads come from the same organisms whose contigs were assembled — expected in production to be more prevalent for low-depth genes.
+
+
+---
+
+## 2026-03-09 (session 8)
+
+### What was done
+
+**SLURM executor plugin compatibility:**
+- Removed `time` / `runtime` string values from all rule `resources:` blocks — the `d-hh:mm:ss` format is only valid within `snakemake-executor-plugin-slurm` and causes a parse error when running locally.
+- Created `config/slurm/config.yaml` — a complete SLURM executor profile following the SWAM-g large-batch pattern. Includes `executor: slurm`, `scheduler: greedy`, `set-threads` and `set-resources` (with `mem_mb` + `runtime`) for all 16 compute rules. Placeholder `slurm_account`/`slurm_partition` to fill in per cluster.
+- Usage: `snakemake --profile config/slurm` (requires `pip install snakemake-executor-plugin-slurm`).
+
+**Pipeline modularity (run_short_reads / run_contigs / run_mags flags):**
+- Three new `config.yaml` stage flags (all default `True`): `run_short_reads`, `run_contigs`, `run_mags`.
+- Two new external-input keys: `clean_reads_dir` (pre-filtered reads, needed when `run_short_reads: False`), `contigs_dir` (pre-assembled contigs, needed when `run_contigs: False` and `run_mags: True`).
+- `common.smk`: added `_RUN_SR/_RUN_CTG/_RUN_MAGS` booleans, `get_clean_r1/r2()` and `get_contigs()` input helpers, `WorkflowError` config validation.
+- `Snakefile` `all_targets()`: fully conditional — each stage block is gated on its flag.
+- `contigs.smk`: `contigs` + `mobmess` rules use `get_clean_r1/r2()`; `contig_abundance` uses all three helpers + optional `scgs` (empty list when `_RUN_SR=False`).
+- `mags.smk`: `bin` rule uses `get_contigs()`.
+- `summary.smk`: `amr_unified` inputs conditional on stage flags.
+- `amr_unified.py`: handles `None` for any optional input (short_reads_amr, contig_summary, markers_cpg).
+- `contig_abundance.py`: falls back to `n_genomes=1` when `scgs` is unavailable.
+- README updated with "Running on SLURM" and "Modular execution" sections.
+- Pushed to `origin/main` (commit `d187e7d`).
+
+### Current pipeline state
+
+Dry-run job counts for all mode combinations (all validated this session):
+- Full pipeline (`test=True`): **32 jobs** ✅
+- Short reads only (`run_contigs=False, run_mags=False`): **6 jobs** ✅
+- Contigs only (`run_short_reads=False, run_mags=False`): **23 jobs** ✅
+- MAGs only (`run_short_reads=False, run_contigs=False`): **8 jobs** ✅
+
+### Known issues / next steps
+- SLURM profile placeholders `slurm_account` and `slurm_partition` must be filled in before cluster use.
+- When `run_short_reads: False`, contig abundance cpg uses `n_genomes=1` (mean depth not genome equivalents) — documented in README.
+- End-to-end full test (`snakemake --use-conda --cores 4 --scheduler greedy --config test=True`) was last confirmed passing in session 7; not re-run this session.
