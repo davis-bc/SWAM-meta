@@ -236,3 +236,31 @@ Dry-run job counts for all mode combinations (all validated this session):
 - SLURM profile placeholders `slurm_account` and `slurm_partition` must be filled in before cluster use.
 - When `run_short_reads: False`, contig abundance cpg uses `n_genomes=1` (mean depth not genome equivalents) — documented in README.
 - End-to-end full test (`snakemake --use-conda --cores 4 --scheduler greedy --config test=True`) was last confirmed passing in session 7; not re-run this session.
+
+## 2026-03-10 (session 9)
+
+### What was done
+- **End-to-end test passed** with the session 8 updates (SLURM profile + modularity flags).
+- Full pipeline ran successfully on both mock samples: **26 steps (100%) done**, exit code 0.
+- Run time: ~21 minutes on 4 cores (21:36 → 21:57).
+
+### Output verification
+
+| File | Size | Notes |
+|------|------|-------|
+| `fastp_summary.csv` | 429 B | ✅ |
+| `short_reads_output.csv` | 15 KB | ✅ |
+| `markers_cpg.csv` | 65 B | ✅ (mock data: pBI143/crAss001 = 0 — expected, not in mock genomes) |
+| `contig_summary.tsv` | 54 KB, 857 rows | ✅ |
+| `AMR_unified.csv` | 15 KB | ✅ evidence=both/short_reads_only working |
+| `AMR_abundance_summary.csv` | 109 B | ✅ |
+| `mag_amr.tsv` / `mag_mge.tsv` / `mag_abundance.tsv` | mock1+mock2 | ✅ |
+
+`AMR_unified.csv` sample: `tet(A)` evidence=both, `cmlA1` evidence=short_reads_only, `tet(M)` molecule_type=phage,plasmid — all as expected.
+
+### Current pipeline state
+✅ **Full end-to-end test passes** with SLURM compatibility + modularity changes.
+
+### Known issues / next steps
+- `markers_cpg.csv` shows pBI143/crAss001 = 0 for both mock samples. This is expected — the mock genomes don't include pBI143 or crAss001 sequences. Production runs with real wastewater samples will show non-zero values.
+- SLURM profile `slurm_account` and `slurm_partition` remain as empty placeholders — fill in before cluster use.
