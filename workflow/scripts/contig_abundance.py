@@ -20,7 +20,7 @@ import pandas as pd
 r1      = snakemake.input.r1
 r2      = snakemake.input.r2
 contigs = snakemake.input.contigs
-scgs    = snakemake.input.scgs
+scgs    = str(snakemake.input.scgs) if snakemake.input.get("scgs") else ""
 bam     = snakemake.output.bam
 bai     = snakemake.output.bai
 tsv     = snakemake.output.tsv
@@ -62,17 +62,20 @@ mean_depth = {cid: sum(vals) / len(vals) for cid, vals in depth_data.items()}
 
 # ---------------------------------------------------------------------------
 # 3. Estimate n_genomes from SCG alignments
+#    Falls back to n_genomes=1 when scgs is unavailable (run_short_reads=False)
 # ---------------------------------------------------------------------------
-scg_df = pd.read_csv(
-    scgs, sep="\t", header=None,
-    names=["qseqid", "sseqid", "pident", "length", "evalue", "bitscore", "slen"]
-)
-scg_df = scg_df.drop_duplicates("qseqid")
-
-if len(scg_df) > 0:
-    n_genomes = (scg_df["length"] / scg_df["slen"]).sum() / 40
+if scgs and os.path.exists(scgs) and os.path.getsize(scgs) > 0:
+    scg_df = pd.read_csv(
+        scgs, sep="\t", header=None,
+        names=["qseqid", "sseqid", "pident", "length", "evalue", "bitscore", "slen"]
+    )
+    scg_df = scg_df.drop_duplicates("qseqid")
+    if len(scg_df) > 0:
+        n_genomes = (scg_df["length"] / scg_df["slen"]).sum() / 40
+    else:
+        n_genomes = 1.0
 else:
-    n_genomes = 1.0  # fallback: 1 genome
+    n_genomes = 1.0  # fallback: no SCG data available
 
 n_genomes = max(n_genomes, 1e-6)
 

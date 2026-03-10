@@ -1,0 +1,135 @@
+# config/slurm/config.yaml
+#
+# Snakemake SLURM executor profile for SWAM-meta.
+# Requires: snakemake-executor-plugin-slurm
+#
+# Usage:
+#   snakemake --profile config/slurm
+#
+# Set slurm_account and slurm_partition below before running on your cluster.
+# Alternatively, override on the command line:
+#   snakemake --profile config/slurm --default-resources slurm_account=myaccount slurm_partition=highmem
+
+# ----------------------------
+#  Executor and global options
+# ----------------------------
+
+executor: slurm
+scheduler: greedy            # Required: avoids PulpSolverError (cbc solver not needed)
+
+jobs: 100                    # Max simultaneous jobs submitted to Slurm
+cores: 1024                  # Max total CPUs across all jobs
+
+use-conda: true
+conda-frontend: conda
+keep-incomplete: true        # Preserve partial output to avoid re-computation
+
+# ----------------------------------------------------
+#  Default resources (applied when not set explicitly)
+# ----------------------------------------------------
+
+default-resources:
+  slurm_account: ""          # Fill in: your HPC account (e.g. "nrsaamr")
+  slurm_partition: ""        # Fill in: target partition (e.g. "'standard'")
+  mem_mb: 4000
+  runtime: "0-06:00:00"
+
+# -----------------------------------------------------------
+#  Per-rule thread allocation
+#  These override the in-rule `threads:` directive.
+#  (In-rule values remain for local/test runs without profile.)
+# -----------------------------------------------------------
+
+set-threads:
+  short_reads: 16
+  contigs: 32
+  genomad: 32
+  mobmess: 32
+  prodigal: 1
+  contig_amr: 16
+  mge_annotation: 16
+  mmseqs_taxonomy: 32
+  contig_abundance: 16
+  bin: 32
+  mag_prodigal: 1
+  mag_amr: 16
+  mag_mge: 16
+  mag_taxonomy: 64
+  mag_metabolism: 64
+  mag_qc: 16
+  mag_abundance: 16
+
+# -----------------------------------------------------------
+#  Per-rule resource allocation
+#  mem_mb: memory in MB per job
+#  runtime: wall-clock limit in Slurm format (d-hh:mm:ss)
+# -----------------------------------------------------------
+
+set-resources:
+  # --- Short reads ---
+  short_reads:
+    mem_mb: 20000
+    runtime: "0-10:00:00"
+
+  # --- Assembly ---
+  contigs:
+    mem_mb: 150000
+    runtime: "3-00:00:00"
+
+  # --- Contig classification ---
+  genomad:
+    mem_mb: 150000
+    runtime: "3-00:00:00"
+  mobmess:
+    mem_mb: 150000
+    runtime: "1-00:00:00"
+
+  # --- Taxonomy DB init ---
+  init_mmseqs_db:
+    mem_mb: 8000
+    runtime: "0-02:00:00"
+
+  # --- Contig annotation ---
+  prodigal:
+    mem_mb: 16000
+    runtime: "0-04:00:00"
+  contig_amr:
+    mem_mb: 16000
+    runtime: "0-06:00:00"
+  mge_annotation:
+    mem_mb: 16000
+    runtime: "0-06:00:00"
+  mmseqs_taxonomy:
+    mem_mb: 64000
+    runtime: "1-00:00:00"
+  contig_abundance:
+    mem_mb: 20000
+    runtime: "0-06:00:00"
+
+  # --- MAG binning ---
+  bin:
+    mem_mb: 150000
+    runtime: "1-00:00:00"
+
+  # --- MAG annotation ---
+  mag_prodigal:
+    mem_mb: 16000
+    runtime: "0-06:00:00"
+  mag_amr:
+    mem_mb: 16000
+    runtime: "0-06:00:00"
+  mag_mge:
+    mem_mb: 16000
+    runtime: "0-06:00:00"
+  mag_taxonomy:
+    mem_mb: 150000
+    runtime: "1-12:00:00"
+  mag_metabolism:
+    mem_mb: 150000
+    runtime: "1-00:00:00"
+  mag_qc:
+    mem_mb: 32000
+    runtime: "0-08:00:00"
+  mag_abundance:
+    mem_mb: 32000
+    runtime: "0-04:00:00"

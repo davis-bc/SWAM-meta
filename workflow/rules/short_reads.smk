@@ -98,7 +98,6 @@ rule short_reads:
     resources:
         mem_mb  = lambda wc: res(20000, 4000),
         threads = lambda wc: res(16, 4),
-        time    = "0-10:00:00"
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.short_reads.txt")
     conda: "../envs/shortreads.yaml"

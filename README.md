@@ -157,6 +157,11 @@ genomad_splits: 1     # increase (e.g. 4–8) to reduce geNomad peak memory
 skip_gtdbtk:   False
 skip_metabolic: False
 skip_checkm2:  False
+
+# Stage control (see "Modular execution" below)
+run_short_reads: True
+run_contigs:     True
+run_mags:        True
 ```
 
 ---
@@ -170,9 +175,6 @@ snakemake -n --use-conda --scheduler greedy
 # Local run
 snakemake --use-conda --cores <N> --scheduler greedy
 
-# SLURM cluster
-snakemake --use-conda --slurm --jobs <N> --scheduler greedy
-
 # Resume after failure
 snakemake --use-conda --cores <N> --scheduler greedy --rerun-incomplete
 
@@ -181,6 +183,67 @@ snakemake --use-conda --cores <N> --scheduler greedy --forcerun <rule_name>
 ```
 
 The first run downloads and indexes the AMRFinderPlus database (~300 MB) and human reference genome (~900 MB) automatically.
+
+---
+
+### 4. Running on SLURM
+
+A ready-to-use SLURM executor profile is provided at `config/slurm/config.yaml`. It requires
+[snakemake-executor-plugin-slurm](https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html):
+
+```bash
+pip install snakemake-executor-plugin-slurm
+```
+
+Edit `config/slurm/config.yaml` and fill in your account and partition:
+
+```yaml
+default-resources:
+  slurm_account: "my_account"      # your HPC allocation
+  slurm_partition: "'highmem'"     # target partition (note inner quotes for SLURM)
+```
+
+Then submit the workflow:
+
+```bash
+snakemake --profile config/slurm
+```
+
+The profile sets `scheduler: greedy` (required — avoids PulpSolverError), manages per-rule thread and memory allocations, and passes wall-clock time limits (`runtime`) to SLURM for every compute rule.
+
+---
+
+### 5. Modular execution
+
+Use the `run_short_reads`, `run_contigs`, and `run_mags` config flags to run only the stages you need:
+
+| `run_short_reads` | `run_contigs` | `run_mags` | What runs | External inputs required |
+|:-:|:-:|:-:|---|---|
+| ✅ | ✅ | ✅ | Full pipeline | None |
+| ✅ | ✅ | ❌ | QC + assembly + annotation | None |
+| ✅ | ❌ | ❌ | Short-reads AMR only | None |
+| ❌ | ✅ | ✅ | Assembly + annotation + MAGs | `clean_reads_dir` |
+| ❌ | ✅ | ❌ | Assembly + annotation | `clean_reads_dir` |
+| ❌ | ❌ | ✅ | MAG binning only | `contigs_dir` + `clean_reads_dir` |
+
+**`clean_reads_dir`** — directory with pre-filtered paired-end reads (`{sample}*R1*.fastq*` + `{sample}*R2*.fastq*`). Required when `run_short_reads: False` and any downstream stage is enabled.
+
+**`contigs_dir`** — directory with pre-assembled contig files named `{sample}.contigs.fa`. Required when `run_contigs: False` and `run_mags: True`.
+
+> **Note:** When `run_short_reads: False`, contig abundance is normalised to mean depth (cpg assumes n_genomes = 1) rather than true genome-equivalent copies, because SCG alignments from the short-reads stage are unavailable.
+
+Example — run short reads + assembly only (skip MAGs):
+```bash
+snakemake --use-conda --cores 32 --scheduler greedy --config run_mags=False
+```
+
+Example — run MAG stage on pre-assembled contigs:
+```bash
+snakemake --use-conda --cores 32 --scheduler greedy \
+  --config run_short_reads=False run_contigs=False \
+           contigs_dir=/path/to/contigs \
+           clean_reads_dir=/path/to/clean_reads
+```
 
 ---
 

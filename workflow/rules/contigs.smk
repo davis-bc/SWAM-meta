@@ -27,15 +27,14 @@ rule init_genomad:
 
 rule contigs:
     input:
-        r1       = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
-        r2       = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz")
+        r1       = get_clean_r1,
+        r2       = get_clean_r2
     output:
         megahit  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa")
     threads: lambda wc: res(32, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(32, 4),
-        time    = "3-00:00:00"
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.contigs.txt")
     conda: "../envs/contigs.yaml"
@@ -88,7 +87,6 @@ rule genomad:
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(32, 4),
-        time    = "3-00:00:00"
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.genomad.txt")
     conda: "../envs/genomad.yaml"
@@ -108,8 +106,8 @@ rule genomad:
 
 rule mobmess:
     input:
-        r1           = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
-        r2           = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz"),
+        r1           = get_clean_r1,
+        r2           = get_clean_r2,
         plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}",  "{sample}.contigs_summary", "{sample}.contigs_plasmid.fna")
     output:
         circular_txt = os.path.join(output_dir, "data", "mobmess", "{sample}.contigs_circular.txt"),
@@ -120,7 +118,6 @@ rule mobmess:
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(32, 4),
-        time    = "1-00:00:00"
     shell:
         """
         mkdir -p $(dirname {output.contig_bam})
@@ -161,7 +158,6 @@ rule init_mmseqs_db:
     resources:
         mem_mb  = lambda wc: res(8000, 4000),
         threads = 1,
-        time    = "0-02:00:00"
     shell:
         """
         mkdir -p $(dirname {output.done})
@@ -198,7 +194,6 @@ rule prodigal:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = 1,
-        time    = "0-04:00:00"
     conda: "../envs/contigs.yaml"
     shell:
         """
@@ -221,7 +216,6 @@ rule contig_amr:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
-        time    = "0-06:00:00"
     conda: "../envs/mags.yaml"
     shell:
         """
@@ -266,7 +260,6 @@ rule mge_annotation:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
-        time    = "0-06:00:00"
     conda: "../envs/mge.yaml"
     shell:
         """
@@ -303,7 +296,6 @@ rule mmseqs_taxonomy:
     resources:
         mem_mb  = lambda wc: res(64000, 4000),
         threads = lambda wc: res(32, 4),
-        time    = "1-00:00:00"
     conda: "../envs/contigs.yaml"
     shell:
         """
@@ -331,10 +323,13 @@ rule mmseqs_taxonomy:
 
 rule contig_abundance:
     input:
-        r1      = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
-        r2      = os.path.join(output_dir, "data", "clean_reads", "{sample}_R2.clean.fastq.gz"),
-        contigs = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        scgs    = os.path.join(output_dir, "data", "alignments", "{sample}.scgs")
+        r1      = get_clean_r1,
+        r2      = get_clean_r2,
+        contigs = get_contigs,
+        scgs    = lambda wc: (
+            os.path.join(output_dir, "data", "alignments", f"{wc.sample}.scgs")
+            if _RUN_SR else []
+        )
     output:
         bam = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam"),
         bai = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam.bai"),
@@ -343,7 +338,6 @@ rule contig_abundance:
     resources:
         mem_mb  = lambda wc: res(20000, 4000),
         threads = lambda wc: res(16, 4),
-        time    = "0-06:00:00"
     conda: "../envs/shortreads.yaml"
     script:
         "../scripts/contig_abundance.py"

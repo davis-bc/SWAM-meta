@@ -38,6 +38,72 @@ def res(production, test=4000):
     """Return test-mode resource value when config test=True, else production."""
     return test if _TEST else production
 
+# ---------------------------------------------------------------------------
+#   Module flags — control which pipeline stages are active
+# ---------------------------------------------------------------------------
+
+_RUN_SR   = config.get("run_short_reads", True)
+_RUN_CTG  = config.get("run_contigs",     True)
+_RUN_MAGS = config.get("run_mags",        True)
+
+# ---------------------------------------------------------------------------
+#   Config validation for external-input scenarios
+# ---------------------------------------------------------------------------
+
+from snakemake.exceptions import WorkflowError
+
+if not _RUN_SR and (_RUN_CTG or _RUN_MAGS) and not config.get("clean_reads_dir"):
+    raise WorkflowError(
+        "run_short_reads: False requires 'clean_reads_dir' in config.yaml "
+        "(directory with pre-filtered {sample}*R1*.fastq* read pairs)."
+    )
+
+if not _RUN_CTG and _RUN_MAGS and not config.get("contigs_dir"):
+    raise WorkflowError(
+        "run_contigs: False with run_mags: True requires 'contigs_dir' in config.yaml "
+        "(directory with pre-assembled {sample}.contigs.fa files)."
+    )
+
+# ---------------------------------------------------------------------------
+#   Input helper functions for dynamic stage routing
+# ---------------------------------------------------------------------------
+
+def get_clean_r1(wildcards):
+    """Return path to host-filtered R1 reads."""
+    if _RUN_SR:
+        return os.path.join(output_dir, "data", "clean_reads", f"{wildcards.sample}_R1.clean.fastq.gz")
+    for pattern in [
+        os.path.join(config["clean_reads_dir"], f"{wildcards.sample}*R1*.fastq*"),
+        os.path.join(config["clean_reads_dir"], f"{wildcards.sample}*_1.fastq*"),
+    ]:
+        hits = glob.glob(pattern)
+        if hits:
+            return sorted(hits)[0]
+    raise WorkflowError(
+        f"No R1 reads found for sample '{wildcards.sample}' in clean_reads_dir: {config['clean_reads_dir']}"
+    )
+
+def get_clean_r2(wildcards):
+    """Return path to host-filtered R2 reads."""
+    if _RUN_SR:
+        return os.path.join(output_dir, "data", "clean_reads", f"{wildcards.sample}_R2.clean.fastq.gz")
+    for pattern in [
+        os.path.join(config["clean_reads_dir"], f"{wildcards.sample}*R2*.fastq*"),
+        os.path.join(config["clean_reads_dir"], f"{wildcards.sample}*_2.fastq*"),
+    ]:
+        hits = glob.glob(pattern)
+        if hits:
+            return sorted(hits)[0]
+    raise WorkflowError(
+        f"No R2 reads found for sample '{wildcards.sample}' in clean_reads_dir: {config['clean_reads_dir']}"
+    )
+
+def get_contigs(wildcards):
+    """Return path to assembled contigs (MEGAHIT output or user-provided)."""
+    if _RUN_CTG:
+        return os.path.join(output_dir, "data", "megahit", f"{wildcards.sample}.contigs.fa")
+    return os.path.join(config["contigs_dir"], f"{wildcards.sample}.contigs.fa")
+
 # ----------------------------------------------
 #   Build a mapping from sample R1 and R2 files
 # ----------------------------------------------

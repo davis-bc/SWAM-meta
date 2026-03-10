@@ -32,11 +32,11 @@ import glob as _glob
 # ---------------------------------------------------------------------------
 # Inputs / outputs
 # ---------------------------------------------------------------------------
-sr_file        = snakemake.input.short_reads_amr   # short_reads_output.csv
-contigs_file   = snakemake.input.contig_summary    # contig_summary.tsv
-catalog_file   = snakemake.input.catalog           # ReferenceGeneCatalog.txt
-contig_amr_dir = snakemake.params.contig_amr_dir   # dir with *_contig_amr.tsv
-markers_file   = snakemake.input.markers_cpg       # markers_cpg.csv
+sr_file        = str(snakemake.input.short_reads_amr) if snakemake.input.get("short_reads_amr") else None
+contigs_file   = str(snakemake.input.contig_summary)  if snakemake.input.get("contig_summary")  else None
+catalog_file   = snakemake.input.catalog               # always present when amr_unified runs
+contig_amr_dir = snakemake.params.contig_amr_dir       # dir with *_contig_amr.tsv
+markers_file   = str(snakemake.input.markers_cpg) if snakemake.input.get("markers_cpg") else None
 out_unified    = snakemake.output.csv
 out_summary    = snakemake.output.amr_abundance_summary
 
@@ -98,7 +98,10 @@ def get_meta(gene_sym):
 # 3. Short-reads: sum cpg per sample × gene_symbol
 #    Also capture per-row metadata (from R script catalog join)
 # ---------------------------------------------------------------------------
-sr = pd.read_csv(sr_file)
+if sr_file and os.path.exists(sr_file):
+    sr = pd.read_csv(sr_file)
+else:
+    sr = pd.DataFrame()
 
 if not sr.empty:
     sr = sr.rename(columns={"allele": "gene_symbol"})
@@ -124,7 +127,10 @@ else:
 # ---------------------------------------------------------------------------
 # 4. Contigs: aggregate AMR features per sample × gene_symbol
 # ---------------------------------------------------------------------------
-cs = pd.read_csv(contigs_file, sep="\t", dtype=str)
+if contigs_file and os.path.exists(contigs_file):
+    cs = pd.read_csv(contigs_file, sep="\t", dtype=str)
+else:
+    cs = pd.DataFrame()
 amr_cs = cs[cs["feature_type"] == "AMR"].copy() if not cs.empty else pd.DataFrame()
 
 if not amr_cs.empty:
@@ -219,7 +225,7 @@ unified[out_cols].to_csv(out_unified, index=False)
 #    available, else short-reads cpg — same logic as the unified table)
 #    pBI143 and crAss001 come from markers_cpg.csv (produced by R script)
 # ---------------------------------------------------------------------------
-markers = pd.read_csv(markers_file)
+markers = pd.read_csv(markers_file) if markers_file and os.path.exists(markers_file) else pd.DataFrame()
 
 amr_total = (
     unified.groupby("sample")
@@ -227,7 +233,7 @@ amr_total = (
     .reset_index()
 )
 
-summary = amr_total.merge(markers, on="sample", how="left")
+summary = amr_total.merge(markers, on="sample", how="left") if not markers.empty else amr_total
 # fill missing marker columns
 for mc in ["pBI143 (cpg)", "crAss001 (cpg)"]:
     if mc not in summary.columns:

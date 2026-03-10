@@ -19,7 +19,7 @@ import os
 
 rule bin:
     input:
-        contigs  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
+        contigs  = get_contigs,
         bam      = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam"),
         bai      = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam.bai")
     output:
@@ -33,7 +33,6 @@ rule bin:
     resources:
         mem_mb  = lambda wc: res(150000, 6000),
         threads = lambda wc: res(32, 4),
-        time    = "1-00:00:00"
     conda: "../envs/mags.yaml"
     shell:
         """
@@ -93,7 +92,6 @@ checkpoint mag_prodigal:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = 1,
-        time    = "0-06:00:00"
     conda: "../envs/mags.yaml"
     shell:
         """
@@ -127,7 +125,6 @@ rule mag_amr:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
-        time    = "0-06:00:00"
     conda: "../envs/mags.yaml"
     shell:
         """
@@ -176,7 +173,6 @@ rule mag_mge:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
-        time    = "0-06:00:00"
     conda: "../envs/mge.yaml"
     shell:
         """
@@ -225,7 +221,6 @@ rule mag_taxonomy:
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(64, 4),
-        time    = "1-12:00:00"
     conda: "../envs/gtdbtk.yaml"
     shell:
         """
@@ -270,7 +265,6 @@ rule mag_metabolism:
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(64, 4),
-        time    = "1-00:00:00"
     conda: "../envs/metabolic.yaml"
     shell:
         """
@@ -305,7 +299,6 @@ rule mag_qc:
     resources:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
-        time    = "0-08:00:00"
     conda: "../envs/checkm2.yaml"
     shell:
         """
@@ -344,7 +337,6 @@ rule mag_abundance:
     resources:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
-        time    = "0-04:00:00"
     conda: "../envs/mags.yaml"
     shell:
         """

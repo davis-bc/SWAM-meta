@@ -33,46 +33,55 @@ localrules: initiate_dbs, short_reads_summary, init_genomad, init_mmseqs_db, ini
 # ------------------------------------------
 
 def all_targets(wildcards):
-    targets = [
-        # Short-read summary
-        os.path.join(output_dir, "fastp_summary.csv"),
-        os.path.join(output_dir, "short_reads_output.csv"),
-        # Assembly
-        *expand(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"), sample=samples),
-        # geNomad classification
-        *expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples),
-        # MobMess plasmid systems
-        *expand(os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt"), sample=samples),
-        # Contig-level summary (AMR + MGE + taxonomy + abundance)
-        os.path.join(output_dir, "contig_summary.tsv"),
-        # Unified AMR abundance (short-reads + contigs, cpg-normalised)
-        os.path.join(output_dir, "AMR_unified.csv"),
-        os.path.join(output_dir, "AMR_abundance_summary.csv"),
-        # MAG binning
-        *expand(os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"), sample=samples),
-        # MAG AMR + MGE
-        *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_amr.tsv"), sample=samples),
-        *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_mge.tsv"), sample=samples),
-        # MAG abundance
-        *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_abundance.tsv"), sample=samples),
-    ]
+    targets = []
 
-    # Optional large-DB steps (skipped in test mode or when explicitly disabled)
-    if not config.get("skip_gtdbtk", False):
-        targets += expand(
-            os.path.join(output_dir, "data", "bins", "{sample}", "gtdbtk.summary.tsv"),
-            sample=samples
-        )
-    if not config.get("skip_metabolic", False):
-        targets += expand(
-            os.path.join(output_dir, "data", "bins", "{sample}", ".metabolic.done"),
-            sample=samples
-        )
-    if not config.get("skip_checkm2", False):
-        targets += expand(
-            os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv"),
-            sample=samples
-        )
+    # --- Short-reads stage ---
+    if _RUN_SR:
+        targets += [
+            os.path.join(output_dir, "fastp_summary.csv"),
+            os.path.join(output_dir, "short_reads_output.csv"),
+            os.path.join(output_dir, "markers_cpg.csv"),
+        ]
+
+    # --- Contig assembly + annotation stage ---
+    if _RUN_CTG:
+        targets += [
+            *expand(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"), sample=samples),
+            *expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples),
+            *expand(os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt"), sample=samples),
+            os.path.join(output_dir, "contig_summary.tsv"),
+        ]
+
+    # --- Unified AMR (requires at least one evidence source) ---
+    if _RUN_SR or _RUN_CTG:
+        targets += [
+            os.path.join(output_dir, "AMR_unified.csv"),
+            os.path.join(output_dir, "AMR_abundance_summary.csv"),
+        ]
+
+    # --- MAG stage ---
+    if _RUN_MAGS:
+        targets += [
+            *expand(os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"), sample=samples),
+            *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_amr.tsv"), sample=samples),
+            *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_mge.tsv"), sample=samples),
+            *expand(os.path.join(output_dir, "data", "bins", "{sample}", "mag_abundance.tsv"), sample=samples),
+        ]
+        if not config.get("skip_gtdbtk", False):
+            targets += expand(
+                os.path.join(output_dir, "data", "bins", "{sample}", "gtdbtk.summary.tsv"),
+                sample=samples
+            )
+        if not config.get("skip_metabolic", False):
+            targets += expand(
+                os.path.join(output_dir, "data", "bins", "{sample}", ".metabolic.done"),
+                sample=samples
+            )
+        if not config.get("skip_checkm2", False):
+            targets += expand(
+                os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv"),
+                sample=samples
+            )
 
     return targets
 

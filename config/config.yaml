@@ -1,3 +1,44 @@
+# -------------------------------------------------------------------
+#  Input / Output directories
+# -------------------------------------------------------------------
+
+in_dir:  ""    # Directory containing paired-end FASTQ files
+out_dir: ""    # Output root directory
+
+# -------------------------------------------------------------------
+#  Stage control — set any stage to False to skip it
+# -------------------------------------------------------------------
+
+# Run fastp QC, host removal, KMA/DIAMOND alignments, Nonpareil,
+# and short_reads_summary (short_reads_output.csv, markers_cpg.csv).
+run_short_reads: True
+
+# Run MEGAHIT assembly + all contig annotation (geNomad, MobMess,
+# Prodigal, AMRFinderPlus, MobileElementFinder, MMseqs2, contig_summary).
+# When False, provide pre-assembled contigs via contigs_dir below.
+run_contigs: True
+
+# Run MetaBAT2 binning and all MAG characterisation (AMR, MGE,
+# taxonomy, metabolism, quality, abundance).
+run_mags: True
+
+# -------------------------------------------------------------------
+#  External inputs — required when bypassing upstream stages
+# -------------------------------------------------------------------
+
+# Required when run_short_reads: False AND run_contigs or run_mags is True.
+# Directory containing host-filtered paired-end reads:
+#   {sample}*R1*.fastq.gz  and  {sample}*R2*.fastq.gz  (or _1/_2 naming)
+clean_reads_dir: ""
+
+# Required when run_contigs: False AND run_mags: True.
+# Directory containing pre-assembled contig files named {sample}.contigs.fa
+contigs_dir: ""
+
+# -------------------------------------------------------------------
+#  Reference databases
+# -------------------------------------------------------------------
+
 scg_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/SCGs_40_All.fasta"
 
 # Path to the pre-built MMseqs2 UniRef50 taxonomy database prefix.
