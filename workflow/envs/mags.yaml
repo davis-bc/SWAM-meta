@@ -9,5 +9,3 @@ dependencies:
   - minimap2
   - samtools>=1.9
   - prodigal
-  - pandas
-  - python >=3.9
