@@ -173,7 +173,7 @@ rule mag_mge:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
-    conda: "../envs/mge.yaml"
+    conda: "../envs/contigs.yaml"
     shell:
         """
         mkdir -p {params.tmp_dir}
@@ -337,7 +337,7 @@ rule mag_abundance:
     resources:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
-    conda: "../envs/mags.yaml"
+    conda: "../envs/shortreads.yaml"
     shell:
         """
         # Count bins; if none exist write empty output and exit cleanly

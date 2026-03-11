@@ -2,7 +2,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - r-base
-  - r-tidyverse
-  - r-jsonlite
-  - nonpareil
+  - r-base=4.4.3
+  - r-tidyverse=2.0.0
+  - r-jsonlite=2.0.0
+  - nonpareil=3.5.5

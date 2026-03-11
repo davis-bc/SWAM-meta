@@ -264,3 +264,44 @@ Dry-run job counts for all mode combinations (all validated this session):
 ### Known issues / next steps
 - `markers_cpg.csv` shows pBI143/crAss001 = 0 for both mock samples. This is expected — the mock genomes don't include pBI143 or crAss001 sequences. Production runs with real wastewater samples will show non-zero values.
 - SLURM profile `slurm_account` and `slurm_partition` remain as empty placeholders — fill in before cluster use.
+
+---
+
+## 2026-03-11 (session 10)
+
+### What was done
+
+**Conda environment restructuring + version pinning:**
+
+**Problem**: `mags.yaml` bundled `coverm` + `ncbi-amrfinderplus` (which pulls biopython) + `samtools>=1.9` — the version constraint caused `LibMambaUnsatisfiableError` during env creation. Several partial fixes were attempted before the SSH connection dropped (commits `86856c8`, `16a9729`, `baacd40`).
+
+**Solution — environment consolidation (9 → 8 envs):**
+
+1. **Moved `coverm` to `shortreads.yaml`** — already has samtools/minimap2; no biopython conflict. Updated `mag_abundance` rule to use `shortreads.yaml`.
+2. **Removed `coverm` and `samtools>=1.9` from `mags.yaml`** — no more biopython + samtools version conflict. `mags.yaml` now: metabat2, ncbi-amrfinderplus, minimap2, samtools, prodigal.
+3. **Merged `mge.yaml` into `contigs.yaml`** — MobileElementFinder's Python deps (biopython, tabulate, pyyaml, click, attrs, cattrs, bcbio-gff, setuptools<70) are compatible with contigs.yaml's Python stack. Deleted `mge.yaml`. Updated `init_mge_tool`, `mge_annotation` (contigs.smk), and `mag_mge` (mags.smk) to use `contigs.yaml`.
+4. **Fixed `contig_abundance` env** — rule uses `script:` (Python), needs pandas/numpy; was using `shortreads.yaml` which has no Python. Moved to `contigs.yaml`.
+5. **Pinned exact versions** for all direct dependencies in each yaml, resolved from `conda env export --no-builds` on built envs.
+
+**Final env inventory (8 envs):**
+
+| File | Key tools | Pinned versions |
+|------|-----------|-----------------|
+| `shortreads.yaml` | fastp, kma, diamond, minimap2, samtools, coverm | ✅ |
+| `contigs.yaml` | megahit, mmseqs2, prodigal, MobMess/PlasX + MobileElementFinder deps | ✅ |
+| `genomad.yaml` | genomad | ✅ |
+| `Renv.yaml` | r-base, r-tidyverse, nonpareil | ✅ |
+| `mags.yaml` | metabat2, ncbi-amrfinderplus, prodigal | ✅ |
+| `checkm2.yaml` | checkm2 | (unpinned — skipped in test) |
+| `gtdbtk.yaml` | gtdbtk | (unpinned — skipped in test) |
+| `metabolic.yaml` | hmmer, perl, R stack | (unpinned — skipped in test) |
+
+**End-to-end test passed**: 30/30 steps (100%) done.
+
+### Current pipeline state
+✅ Full end-to-end test passes with restructured, version-pinned environments.
+
+### Known issues / next steps
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` are not version-pinned (skipped in test mode — need a production run to export their resolved versions).
+- `igraph` in `contigs.yaml` is unpinned — conda did not resolve it as a named package (likely satisfied via pip by PlasX/MobMess). Left in yaml for completeness.
+- SLURM profile placeholders `slurm_account` and `slurm_partition` still need filling in before cluster use.

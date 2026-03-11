@@ -239,7 +239,7 @@ rule init_mge_tool:
     """Install MobileElementFinder via pip --no-deps (conda provides all deps)."""
     output:
         done = os.path.join(output_dir, "data", "mge_contigs", ".mef_install.done")
-    conda: "../envs/mge.yaml"
+    conda: "../envs/contigs.yaml"
     shell:
         """
         mkdir -p $(dirname {output.done})
@@ -260,7 +260,7 @@ rule mge_annotation:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
-    conda: "../envs/mge.yaml"
+    conda: "../envs/contigs.yaml"
     shell:
         """
         mkdir -p {output.tmp}
@@ -338,7 +338,7 @@ rule contig_abundance:
     resources:
         mem_mb  = lambda wc: res(20000, 4000),
         threads = lambda wc: res(16, 4),
-    conda: "../envs/shortreads.yaml"
+    conda: "../envs/contigs.yaml"
     script:
         "../scripts/contig_abundance.py"
 

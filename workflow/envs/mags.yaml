@@ -1,11 +1,10 @@
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
   - defaults
 dependencies:
-  - metabat2
-  - coverm
-  - ncbi-amrfinderplus
-  - minimap2
-  - samtools>=1.9
-  - prodigal
+  - metabat2=2.18
+  - ncbi-amrfinderplus=4.2.7
+  - minimap2=2.30
+  - samtools=1.23
+  - prodigal=2.6.3
