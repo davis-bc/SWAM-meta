@@ -7,7 +7,7 @@ dependencies:
   - coverm
   - ncbi-amrfinderplus
   - minimap2
-  - samtools
+  - samtools>=1.9
   - prodigal
   - pandas
   - python >=3.9
