@@ -11,7 +11,7 @@ rule init_genomad:
         if [ ! -d $(dirname {output.genomad_db})/genomad_db ]; then
         
         cd $(dirname {output.genomad_db})
-        genomad download-database .
+        curl -L https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz | tar -xz
         touch {output.genomad_db}
         
         else 
