@@ -1,6 +1,6 @@
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
   - defaults
 dependencies:
   - prodigal
@@ -10,7 +10,7 @@ dependencies:
   - python >=3.9
   - pandas
   - numpy
-  - biopython <=1.80
+  - biopython
   - tabulate
   - pyyaml
   - click
