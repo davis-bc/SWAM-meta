@@ -305,3 +305,21 @@ Dry-run job counts for all mode combinations (all validated this session):
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` are not version-pinned (skipped in test mode — need a production run to export their resolved versions).
 - `igraph` in `contigs.yaml` is unpinned — conda did not resolve it as a named package (likely satisfied via pip by PlasX/MobMess). Left in yaml for completeness.
 - SLURM profile placeholders `slurm_account` and `slurm_partition` still need filling in before cluster use.
+
+---
+
+## 2026-03-16 (session 11)
+
+### What was done
+- Replaced the hand-maintained ASCII `README.md` "Pipeline stages" block with a generated Snakemake rulegraph image.
+- Added `docs/rulegraph.png`, rendered with Graphviz from `snakemake --snakefile workflow/Snakefile --rulegraph`.
+- Generated the image using the mock input directory (`in_dir=test/data`, `out_dir=test/output`, `markers_db=test/dbs/markers`) so the DAG includes real samples while still showing the full workflow, including optional MAG taxonomy, metabolism, and CheckM2 branches.
+- Removed the temporary `docs/rulegraph.dot` file after rendering so only the committed PNG asset remains.
+
+### Current pipeline state
+- Workflow logic is unchanged; this session only updated documentation and added a generated visualization asset.
+- `README.md` now documents the pipeline structure using the actual rule dependency graph from the Snakemake workflow instead of a prose-only stage list.
+
+### Known issues / next steps
+- If rules or dependencies change, `docs/rulegraph.png` should be regenerated so the README stays in sync with the workflow DAG.
+- The rulegraph is more accurate than the old text block, but it is denser; keep surrounding README sections clear so new users still have high-level narrative context.

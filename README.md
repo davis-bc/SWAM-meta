@@ -15,39 +15,9 @@ SWAM-meta takes paired-end FASTQ files and produces a fully normalised, multi-ev
 
 ## Pipeline stages
 
-```
-raw reads
-  └─ fastp QC + minimap2 host removal
-       ├─ KMA → AMR gene alignment (AMRFinderPlus nucleotide DB)
-       ├─ DIAMOND → 40 single-copy genes (genome count estimation)
-       ├─ KMA → anthropogenic markers (pBI143, crAss001)
-       ├─ Nonpareil → metagenomic coverage
-       └─ short_reads_output.csv + fastp_summary.csv + markers_cpg.csv
+The rule dependency graph below is generated directly from `workflow/Snakefile`, so it reflects the current Snakemake DAG rather than a manually maintained stage list. It includes the optional MAG taxonomy, metabolism, and quality-control branches when those stages are enabled.
 
-clean reads
-  └─ MEGAHIT assembly (meta-large, min contig 1 000 bp)
-       ├─ geNomad → chromosome / plasmid / phage classification
-       ├─ MobMess → plasmid circularity + system inference
-       ├─ Prodigal → ORF prediction (shared by AMR + summary)
-       ├─ AMRFinderPlus → contig AMR annotation
-       ├─ MobileElementFinder → contig MGE annotation
-       ├─ MMseqs2 easy-taxonomy (UniRef50) → contig taxonomy
-       ├─ minimap2 + samtools depth → contig cpg abundance
-       └─ contig_summary.tsv (all per-contig annotations joined)
-
-contig_summary.tsv + short_reads_output.csv
-  └─ amr_unified.py → AMR_unified.csv + AMR_abundance_summary.csv
-
-contigs + contig BAM
-  └─ MetaBAT2 → MAG binning (checkpoint: bins discovered dynamically)
-       ├─ Prodigal → per-bin ORFs
-       ├─ AMRFinderPlus → MAG AMR
-       ├─ MobileElementFinder → MAG MGE
-       ├─ CheckM2 → MAG completeness / contamination (optional)
-       ├─ GTDB-tk classify_wf → MAG taxonomy (optional)
-       ├─ METABOLIC-G → MAG metabolic potential (optional)
-       └─ CoverM genome → MAG abundance (trimmed mean, ≥10% coverage)
-```
+[![SWAM-meta rulegraph](docs/rulegraph.png)](docs/rulegraph.png)
 
 ---
 
@@ -329,4 +299,3 @@ test/
 docs/
   session-log.md                # Copilot session log
 ```
-
