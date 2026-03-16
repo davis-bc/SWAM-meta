@@ -1,43 +1,64 @@
-# config/slurm/config.yaml
+# config/slurm/large-batch/config.yaml
 #
-# Snakemake SLURM executor profile for SWAM-meta.
-# Requires: snakemake-executor-plugin-slurm
+# Use this profile for runs with >=50 samples.
+# Selected lightweight per-sample annotation/QC rules are batched into a
+# single Slurm job, while heavy assembly, taxonomy, and binning rules remain
+# one job per sample.
 #
-# Usage:
-#   snakemake --profile config/slurm
-#
-# Set slurm_account and slurm_partition below before running on your cluster.
-# Alternatively, override on the command line:
-#   snakemake --profile config/slurm --default-resources slurm_account=myaccount slurm_partition=highmem
+# Usage: snakemake --profile config/slurm/large-batch ...
 
 # ----------------------------
-#  Executor and global options
+#  Global Slurm limits
 # ----------------------------
 
 executor: slurm
-scheduler: greedy            # Required: avoids PulpSolverError (cbc solver not needed)
+scheduler: greedy
 
-jobs: 100                    # Max simultaneous jobs submitted to Slurm
-cores: 1024                  # Max total CPUs across all jobs
+jobs: 100
+cores: 1024
 
 use-conda: true
 conda-frontend: conda
-keep-incomplete: true        # Preserve partial output to avoid re-computation
+keep-incomplete: true
 
 # ----------------------------------------------------
 #  Default resources (applied when not set explicitly)
 # ----------------------------------------------------
 
 default-resources:
-  slurm_account: ""          # Fill in: your HPC account (e.g. "nrsaamr")
-  slurm_partition: ""        # Fill in: target partition (e.g. "'standard'")
+  slurm_account: ""
+  slurm_partition: ""
   mem_mb: 4000
   runtime: "0-06:00:00"
 
 # -----------------------------------------------------------
+#  Groups — batch lightweight sample-parallel rules
+# -----------------------------------------------------------
+
+groups:
+  contig_amr: "contig_amr"
+  mge_annotation: "mge_annotation"
+  mag_amr: "mag_amr"
+  mag_mge: "mag_mge"
+  mag_qc: "mag_qc"
+  mag_abundance: "mag_abundance"
+
+# -----------------------------------------------------------
+#  Batch size — number of samples per grouped Slurm job
+#  Resources below are summed across all samples in a batch.
+# -----------------------------------------------------------
+
+group-components:
+  contig_amr: 8
+  mge_annotation: 8
+  mag_amr: 8
+  mag_mge: 8
+  mag_qc: 4
+  mag_abundance: 4
+
+# -----------------------------------------------------------
 #  Per-rule thread allocation
 #  These override the in-rule `threads:` directive.
-#  (In-rule values remain for local/test runs without profile.)
 # -----------------------------------------------------------
 
 set-threads:
@@ -63,6 +84,7 @@ set-threads:
 #  Per-rule resource allocation
 #  mem_mb: memory in MB per job
 #  runtime: wall-clock limit in Slurm format (d-hh:mm:ss)
+#  Grouped rules: Slurm total = value x group-components
 # -----------------------------------------------------------
 
 set-resources:
@@ -71,25 +93,33 @@ set-resources:
     mem_mb: 20000
     runtime: "0-10:00:00"
 
-  # --- Assembly ---
+  # --- Assembly / heavy per-sample jobs (not grouped) ---
   contigs:
     mem_mb: 150000
     runtime: "3-00:00:00"
-
-  # --- Contig classification ---
   genomad:
     mem_mb: 150000
     runtime: "3-00:00:00"
   mobmess:
     mem_mb: 150000
     runtime: "1-00:00:00"
+  mmseqs_taxonomy:
+    mem_mb: 64000
+    runtime: "1-00:00:00"
+  contig_abundance:
+    mem_mb: 20000
+    runtime: "0-06:00:00"
+  bin:
+    mem_mb: 150000
+    runtime: "1-00:00:00"
+  mag_taxonomy:
+    mem_mb: 150000
+    runtime: "1-12:00:00"
+  mag_metabolism:
+    mem_mb: 150000
+    runtime: "1-00:00:00"
 
-  # --- Taxonomy DB init ---
-  init_mmseqs_db:
-    mem_mb: 8000
-    runtime: "0-02:00:00"
-
-  # --- Contig annotation ---
+  # --- Lightweight contig annotation (grouped) ---
   prodigal:
     mem_mb: 16000
     runtime: "0-04:00:00"
@@ -99,19 +129,8 @@ set-resources:
   mge_annotation:
     mem_mb: 16000
     runtime: "0-06:00:00"
-  mmseqs_taxonomy:
-    mem_mb: 64000
-    runtime: "1-00:00:00"
-  contig_abundance:
-    mem_mb: 20000
-    runtime: "0-06:00:00"
 
-  # --- MAG binning ---
-  bin:
-    mem_mb: 150000
-    runtime: "1-00:00:00"
-
-  # --- MAG annotation ---
+  # --- Lightweight MAG annotation / QC (grouped) ---
   mag_prodigal:
     mem_mb: 16000
     runtime: "0-06:00:00"
@@ -121,12 +140,6 @@ set-resources:
   mag_mge:
     mem_mb: 16000
     runtime: "0-06:00:00"
-  mag_taxonomy:
-    mem_mb: 150000
-    runtime: "1-12:00:00"
-  mag_metabolism:
-    mem_mb: 150000
-    runtime: "1-00:00:00"
   mag_qc:
     mem_mb: 32000
     runtime: "0-08:00:00"

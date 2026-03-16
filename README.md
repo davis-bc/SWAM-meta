@@ -158,14 +158,22 @@ The first run downloads and indexes the AMRFinderPlus database (~300 MB) and hum
 
 ### 4. Running on SLURM
 
-A ready-to-use SLURM executor profile is provided at `config/slurm/config.yaml`. It requires
-[snakemake-executor-plugin-slurm](https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html):
+SWAM-meta uses
+[snakemake-executor-plugin-slurm](https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html)
+with two SLURM profiles:
+
+| Profile | Recommended for | Behavior |
+|---------|------------------|----------|
+| `config/slurm/large-batch` | **>=50 samples** | Lightweight annotation/QC rules are batched across multiple samples per Slurm job; heavy assembly, taxonomy, and binning rules still run one sample per job |
+| `config/slurm/small-batch` | **<50 samples** | Each sample-parallel rule runs as its own individual Slurm job |
+
+Install the executor plugin first:
 
 ```bash
 pip install snakemake-executor-plugin-slurm
 ```
 
-Edit `config/slurm/config.yaml` and fill in your account and partition:
+Edit both profile configs and fill in your account and partition:
 
 ```yaml
 default-resources:
@@ -173,13 +181,17 @@ default-resources:
   slurm_partition: "'highmem'"     # target partition (note inner quotes for SLURM)
 ```
 
-Then submit the workflow:
+Then choose the appropriate profile when submitting:
 
 ```bash
-snakemake --profile config/slurm
+snakemake --profile config/slurm/large-batch
 ```
 
-The profile sets `scheduler: greedy` (required — avoids PulpSolverError), manages per-rule thread and memory allocations, and passes wall-clock time limits (`runtime`) to SLURM for every compute rule.
+```bash
+snakemake --profile config/slurm/small-batch
+```
+
+Both profiles set `scheduler: greedy`, manage per-rule `threads`, `mem_mb`, and `runtime` explicitly in profile YAML, and keep resource tuning out of the `.smk` rule files. There is no local profile in this repository due to resource constraints; local runs should continue using the explicit `--cores` commands shown above.
 
 ---
 

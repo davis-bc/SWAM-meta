@@ -323,3 +323,30 @@ Dry-run job counts for all mode combinations (all validated this session):
 ### Known issues / next steps
 - If rules or dependencies change, `docs/rulegraph.png` should be regenerated so the README stays in sync with the workflow DAG.
 - The rulegraph is more accurate than the old text block, but it is denser; keep surrounding README sections clear so new users still have high-level narrative context.
+
+---
+
+## 2026-03-16 (session 12)
+
+### What was done
+- Replaced the legacy single SLURM profile `config/slurm/config.yaml` with two `snakemake-executor-plugin-slurm` profiles:
+  - `config/slurm/large-batch/config.yaml`
+  - `config/slurm/small-batch/config.yaml`
+- Followed the SWAM-g profile pattern: explicit `set-threads` and explicit `set-resources` for all compute rules, with `executor: slurm` and `scheduler: greedy` defined in profile YAML.
+- Implemented conservative batching only in `large-batch`: `contig_amr`, `mge_annotation`, `mag_amr`, `mag_mge`, `mag_qc`, and `mag_abundance` are grouped; heavy assembly, taxonomy, and binning rules remain one sample per job.
+- Updated `README.md` to document profile selection (`>=50` samples => `large-batch`, `<50` samples => `small-batch`), plugin installation, and the absence of a local profile.
+- Updated `.github/copilot-instructions.md` to stop recommending legacy `--slurm` execution and instead use `snakemake --profile config/slurm/{small-batch,large-batch}`.
+
+### Validation
+- Verified both profiles parse and run a dry-run successfully with a local executor override:
+  - `snakemake --profile config/slurm/small-batch --executor local -n --config test=True`
+  - `snakemake --profile config/slurm/large-batch --executor local -n --config test=True`
+- Both commands completed successfully and built the expected test DAG (36 dry-run jobs reported in the current workspace state).
+
+### Current pipeline state
+- The workflow logic is unchanged; this session only updates cluster execution configuration and related documentation.
+- SWAM-meta now has two supported SLURM entrypoints and no fallback top-level SLURM profile.
+
+### Known issues / next steps
+- Users still need to populate `slurm_account` and `slurm_partition` in both profile files before running on a real cluster.
+- The large-batch grouping strategy is intentionally conservative; if cluster utilization remains low, batch sizes can be increased later in profile YAML without changing rule files.
