@@ -350,3 +350,20 @@ Dry-run job counts for all mode combinations (all validated this session):
 ### Known issues / next steps
 - Users still need to populate `slurm_account` and `slurm_partition` in both profile files before running on a real cluster.
 - The large-batch grouping strategy is intentionally conservative; if cluster utilization remains low, batch sizes can be increased later in profile YAML without changing rule files.
+
+---
+
+## 2026-03-16 (session 13)
+
+### What was done
+- Updated `README.md` install guidance to make the new cluster requirements explicit:
+  - raised the documented Snakemake requirement to `>=8`
+  - added base-environment install commands for Snakemake
+  - added the combined `snakemake>=8` + `snakemake-executor-plugin-slurm` install command for SLURM users
+- Updated the SLURM section to reference the combined conda install command rather than only installing the plugin in isolation.
+
+### Current pipeline state
+- Workflow logic is unchanged; this was a documentation-only follow-up to the SLURM profile migration.
+
+### Known issues / next steps
+- The README now reflects the plugin-based profile setup, but users still need to set `slurm_account` and `slurm_partition` in both SLURM profile files before cluster execution.

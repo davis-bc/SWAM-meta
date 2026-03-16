@@ -24,7 +24,7 @@ The rule dependency graph below is generated directly from `workflow/Snakefile`,
 ## Requirements
 
 - [Conda](https://docs.conda.io/) or [Mamba](https://mamba.readthedocs.io/) (Mamba recommended for faster env solving)
-- [Snakemake](https://snakemake.readthedocs.io/) ≥ 7
+- [Snakemake](https://snakemake.readthedocs.io/) ≥ 8
 
 All other tools are installed automatically into isolated conda environments on first run (`--use-conda`).
 
@@ -39,7 +39,19 @@ git clone https://github.com/<org>/SWAM-meta.git
 cd SWAM-meta
 ```
 
-No additional build step is needed; `--use-conda` handles all tool installation.
+Install Snakemake itself in your base environment before running the workflow:
+
+```bash
+conda install "snakemake>=8"
+```
+
+If you plan to run on SLURM with the bundled profiles, also install the executor plugin:
+
+```bash
+conda install "snakemake>=8" snakemake-executor-plugin-slurm
+```
+
+All workflow tools are then installed automatically into isolated conda environments on first run via `--use-conda`.
 
 ---
 
@@ -167,10 +179,10 @@ with two SLURM profiles:
 | `config/slurm/large-batch` | **>=50 samples** | Lightweight annotation/QC rules are batched across multiple samples per Slurm job; heavy assembly, taxonomy, and binning rules still run one sample per job |
 | `config/slurm/small-batch` | **<50 samples** | Each sample-parallel rule runs as its own individual Slurm job |
 
-Install the executor plugin first:
+Install Snakemake 8+ and the executor plugin in your base environment:
 
 ```bash
-pip install snakemake-executor-plugin-slurm
+conda install "snakemake>=8" snakemake-executor-plugin-slurm
 ```
 
 Edit both profile configs and fill in your account and partition:
