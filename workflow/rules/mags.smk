@@ -33,17 +33,19 @@ rule bin:
     resources:
         mem_mb  = lambda wc: res(150000, 6000),
         threads = lambda wc: res(32, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.bin.log")
     conda: "../envs/mags.yaml"
     shell:
         """
         mkdir -p {params.bin_dir}
 
-        # Generate contig depth profile (reused by CoverM via the BAM,
-        # but we write the MetaBAT2 depth file here for binning)
+        echo "[{wildcards.sample}] MetaBAT2: profiling contig depths..."
         jgi_summarize_bam_contig_depths \
             --outputDepth {output.depth} \
-            {input.bam}
+            {input.bam} >> {log} 2>&1
 
+        echo "[{wildcards.sample}] MetaBAT2: binning contigs..."
         metabat2 \
             -i {input.contigs} \
             -a {output.depth} \
@@ -51,22 +53,18 @@ rule bin:
             -m {params.min_contig} \
             --minClsSize {params.min_cls} \
             -t {resources.threads} \
-            --seed 42
+            --seed 42 >> {log} 2>&1
 
         # Strip MetaBAT2's tab-separated depth info from bin FASTA headers.
-        # CoverM genome mode matches sequence names from the BAM (which are
-        # truncated at the first whitespace) against FASTA header names.
-        # MetaBAT2 appends "\ttotal_depth=...\tsample_depths=..." to each
-        # header; removing it ensures names match the BAM reference names.
         for fa in {params.bin_dir}/*.fa; do
             [ -f "$fa" ] || continue
             sed -i 's/\t.*//' "$fa"
         done
 
-        # Write an empty bin placeholder if no bins were produced
-        # (common with small test assemblies)
         if [ -z "$(ls -A {params.bin_dir})" ]; then
-            echo "No bins produced for {wildcards.sample}" >&2
+            echo "[{wildcards.sample}] MetaBAT2: no bins produced"
+        else
+            echo "[{wildcards.sample}] MetaBAT2: done"
         fi
 
         touch {output.done}
@@ -92,10 +90,13 @@ checkpoint mag_prodigal:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = 1,
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_prodigal.log")
     conda: "../envs/mags.yaml"
     shell:
         """
         mkdir -p {params.prd_dir}
+        echo "[{wildcards.sample}] Prodigal: predicting genes in MAG bins..."
         for fa in {params.bin_dir}/*.fa; do
             [ -f "$fa" ] || continue
             bin=$(basename "$fa" .fa)
@@ -104,9 +105,10 @@ checkpoint mag_prodigal:
                 -a {params.prd_dir}/$bin.faa \
                 -f gff \
                 -o {params.prd_dir}/$bin.gff \
-                -p meta -q
+                -p meta -q >> {log} 2>&1
         done
         touch {output.done}
+        echo "[{wildcards.sample}] Prodigal: done"
         """
 
 # ---------------------------------------------------------------------------
@@ -125,9 +127,12 @@ rule mag_amr:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_amr.log")
     conda: "../envs/mags.yaml"
     shell:
         """
+        echo "[{wildcards.sample}] AMRFinderPlus: annotating MAG bins..."
         # Write a header-only TSV then append per-bin results
         TMP_AMR=$(mktemp)
         HEADER_WRITTEN=0
@@ -143,7 +148,7 @@ rule mag_amr:
                 -g "$gff" \
                 --threads {resources.threads} \
                 --annotation_format prodigal \
-                -o "$TMP_AMR.bin" 2>/dev/null || true
+                -o "$TMP_AMR.bin" >> {log} 2>&1 || true
             if [ -s "$TMP_AMR.bin" ]; then
                 if [ $HEADER_WRITTEN -eq 0 ]; then
                     head -1 "$TMP_AMR.bin" > "$TMP_AMR"
@@ -154,6 +159,7 @@ rule mag_amr:
         done
         mv "$TMP_AMR" {output.tsv}
         [ -f {output.tsv} ] || printf "bin_id\\n" > {output.tsv}
+        echo "[{wildcards.sample}] AMRFinderPlus: done"
         """
 
 # ---------------------------------------------------------------------------
@@ -173,10 +179,13 @@ rule mag_mge:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_mge.log")
     conda: "../envs/contigs.yaml"
     shell:
         """
         mkdir -p {params.tmp_dir}
+        echo "[{wildcards.sample}] MobileElementFinder: annotating MAG MGEs..."
         TMP_MGE=$(mktemp)
         HEADER_WRITTEN=0
         for fa in {params.bin_dir}/*.fa; do
@@ -188,7 +197,7 @@ rule mag_mge:
                 --contig "$fa" \
                 --temp-dir {params.tmp_dir}/$bin \
                 --threads {resources.threads} \
-                "${{PREFIX}}_out" || true
+                "${{PREFIX}}_out" >> {log} 2>&1 || true
             csv="${{PREFIX}}_out.csv"
             if [ -s "$csv" ]; then
                 if [ $HEADER_WRITTEN -eq 0 ]; then
@@ -201,6 +210,7 @@ rule mag_mge:
         rm -rf {params.tmp_dir}
         mv "$TMP_MGE" {output.tsv}
         [ -f {output.tsv} ] || printf "bin_id\\n" > {output.tsv}
+        echo "[{wildcards.sample}] MobileElementFinder: done"
         """
 
 # ---------------------------------------------------------------------------
@@ -221,13 +231,16 @@ rule mag_taxonomy:
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(64, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_taxonomy.log")
     conda: "../envs/gtdbtk.yaml"
     shell:
         """
         if [ "{params.skip}" = "True" ]; then
-            echo "GTDB-tk skipped (skip_gtdbtk=True)" >&2
+            echo "[{wildcards.sample}] GTDB-tk: skipped (skip_gtdbtk=True)"
             printf "user_genome\\tclassification\\n" > {output.tsv}
         else
+            echo "[{wildcards.sample}] GTDB-tk: classifying MAG taxonomy..."
             export GTDBTK_DATA_PATH="{params.gtdb_db}"
             mkdir -p {params.out_dir}
             gtdbtk classify_wf \
@@ -235,7 +248,7 @@ rule mag_taxonomy:
                 --extension fa \
                 --out_dir {params.out_dir} \
                 --cpus {resources.threads} \
-                --skip_ani_screen
+                --skip_ani_screen >> {log} 2>&1
             # Combine archaea + bacteria summaries
             TMP=$(mktemp)
             for f in {params.out_dir}/classify/gtdbtk.*.summary.tsv; do
@@ -244,6 +257,7 @@ rule mag_taxonomy:
             done
             mv "$TMP" {output.tsv}
             [ -f {output.tsv} ] || printf "user_genome\\tclassification\\n" > {output.tsv}
+            echo "[{wildcards.sample}] GTDB-tk: done"
         fi
         """
 
@@ -265,18 +279,22 @@ rule mag_metabolism:
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(64, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_metabolism.log")
     conda: "../envs/metabolic.yaml"
     shell:
         """
         if [ "{params.skip}" = "True" ]; then
-            echo "METABOLIC skipped (skip_metabolic=True)" >&2
+            echo "[{wildcards.sample}] METABOLIC: skipped (skip_metabolic=True)"
         else
+            echo "[{wildcards.sample}] METABOLIC: profiling metabolism..."
             mkdir -p {params.out_dir}
             perl {params.metabolic_dir}/METABOLIC-G.pl \
                 -in {params.bin_dir} \
                 -r {params.out_dir}/reads_list.txt \
                 -o {params.out_dir} \
-                -t {resources.threads}
+                -t {resources.threads} >> {log} 2>&1
+            echo "[{wildcards.sample}] METABOLIC: done"
         fi
         touch {output.done}
         """
@@ -299,25 +317,30 @@ rule mag_qc:
     resources:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_qc.log")
     conda: "../envs/checkm2.yaml"
     shell:
         """
         if [ "{params.skip}" = "True" ]; then
-            echo "CheckM2 skipped (skip_checkm2=True)" >&2
+            echo "[{wildcards.sample}] CheckM2: skipped (skip_checkm2=True)"
             printf "Name\\tCompleteness\\tContamination\\n" > {output.tsv}
         else
             n_bins=$(find {params.bin_dir} -name "*.fa" 2>/dev/null | wc -l)
             if [ "$n_bins" -eq 0 ]; then
+                echo "[{wildcards.sample}] CheckM2: no bins to assess"
                 printf "Name\\tCompleteness\\tContamination\\n" > {output.tsv}
             else
+                echo "[{wildcards.sample}] CheckM2: assessing MAG quality..."
                 mkdir -p {params.out_dir}
                 checkm2 predict \
                     --input {params.bin_dir} \
                     --output-directory {params.out_dir} \
                     --database_path {params.db_path} \
                     --threads {resources.threads} \
-                    -x fa
+                    -x fa >> {log} 2>&1
                 cp {params.out_dir}/quality_report.tsv {output.tsv}
+                echo "[{wildcards.sample}] CheckM2: done"
             fi
         fi
         """
@@ -337,20 +360,25 @@ rule mag_abundance:
     resources:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_abundance.log")
     conda: "../envs/shortreads.yaml"
     shell:
         """
         # Count bins; if none exist write empty output and exit cleanly
         n_bins=$(find {params.bin_dir} -name "*.fa" 2>/dev/null | wc -l)
         if [ "$n_bins" -eq 0 ]; then
+            echo "[{wildcards.sample}] CoverM: no bins found, skipping"
             printf "Genome\\ttrimmed_mean\\n" > {output.tsv}
         else
+            echo "[{wildcards.sample}] CoverM: computing MAG abundance..."
             coverm genome \
                 --bam-files {input.bam} \
                 --genome-fasta-files {params.bin_dir}/*.fa \
                 --methods trimmed_mean \
                 --min-covered-fraction 0.1 \
                 --threads {resources.threads} \
-                --output-file {output.tsv}
+                --output-file {output.tsv} >> {log} 2>&1
+            echo "[{wildcards.sample}] CoverM: done"
         fi
         """

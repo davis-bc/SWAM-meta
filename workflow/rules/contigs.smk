@@ -5,18 +5,22 @@
 rule init_genomad:
     output:
         genomad_db   = os.path.join(output_dir, "data", "genomad", ".genomad.db.done.txt") 
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "init_genomad.log")
     conda: "../envs/genomad.yaml"
     shell:
         """
         if [ ! -d $(dirname {output.genomad_db})/genomad_db ]; then
         
+        echo "geNomad: downloading database..."
         cd $(dirname {output.genomad_db})
-        curl -L https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz | tar -xz
+        curl -L https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz 2>> {log} | tar -xz 2>> {log}
         touch {output.genomad_db}
+        echo "geNomad: database ready"
         
         else 
         
-        echo "geNomad database exists, skipping setup"
+        echo "geNomad: database already exists, skipping download"
         touch {output.genomad_db}
         
         fi
@@ -37,11 +41,13 @@ rule contigs:
         threads = lambda wc: res(32, 4),
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.contigs.txt")
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.megahit.log")
     conda: "../envs/contigs.yaml"
     shell:
         """
         set -euo pipefail
-        echo "assembling with megahit"
+        echo "[{wildcards.sample}] MEGAHIT: assembling contigs..."
 
         # create temporary directory in same parent so moves are on same fs (atomic)
         tmpdir="$(mktemp -d "$(dirname {output.megahit})/megahit_{wildcards.sample}.tmp.XXXXXX")"
@@ -54,10 +60,9 @@ rule contigs:
                 -o "$tmpdir" \
                 --out-prefix {wildcards.sample} \
                 --continue \
-                -f 
+                -f >> {log} 2>&1
 
         # Move the contigs file into the final megahit directory.
-        # Overwrite if exists (protected() in Snakemake prevents accidental deletion by Snakemake, but we still overwrite intentionally).
         mv -f "$tmpdir/{wildcards.sample}.contigs.fa" {output.megahit}
 
         # Clean up the rest of temporary files
@@ -65,6 +70,7 @@ rule contigs:
         
         # rename fasta headers to include sample information
         sed -E -i 's/>/>{wildcards.sample}-/g' {output.megahit}
+        echo "[{wildcards.sample}] MEGAHIT: done"
         
         """
     
@@ -89,15 +95,17 @@ rule genomad:
         threads = lambda wc: res(32, 4),
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.genomad.txt")
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.genomad.log")
     conda: "../envs/genomad.yaml"
     shell:
         """
-        # classify contigs into chromosome/phage/plasmid
-        echo "running geNomad"
+        echo "[{wildcards.sample}] geNomad: classifying contigs (chromosome/plasmid/phage)..."
         genomad end-to-end {input.contigs} {output.genomad} $(dirname {input.genomad_db})/genomad_db \
-            --relaxed --cleanup --splits {params.splits}
+            --relaxed --cleanup --splits {params.splits} >> {log} 2>&1
         # touch missing output files (geNomad omits them when no hits are found)
         touch {output.plas_contigs} {output.plas_summary} {output.vir_summary}
+        echo "[{wildcards.sample}] geNomad: done"
         """
 
 # ----------------------------------------------------------------------------------
@@ -118,23 +126,29 @@ rule mobmess:
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(32, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mobmess.log")
     shell:
         """
         mkdir -p $(dirname {output.contig_bam})
         # Skip processing if plasmid FASTA is empty (no plasmids found by geNomad)
         if [ ! -s {input.plas_contigs} ]; then
+            echo "[{wildcards.sample}] MobMess: no plasmids found, skipping"
             touch {output.contig_bam} {output.circular_txt} {output.mobmess}
         else
-            # map reads to plasmid contigs
-            minimap2 -t {resources.threads} -ax sr {input.plas_contigs} {input.r1} {input.r2} | samtools sort -@4 -o {output.contig_bam} - && samtools index {output.contig_bam}
+            echo "[{wildcards.sample}] minimap2: mapping reads to plasmid contigs..."
+            minimap2 -t {resources.threads} -ax sr {input.plas_contigs} {input.r1} {input.r2} 2>> {log} \
+            | samtools sort -@4 -o {output.contig_bam} - 2>> {log} && samtools index {output.contig_bam} 2>> {log}
+            echo "[{wildcards.sample}] minimap2: done"
             
-            # detect circularity of plasmid contigs
-            workflow/scripts/detect_circular_contigs.py -b {output.contig_bam} -o {output.circular_txt}
+            echo "[{wildcards.sample}] MobMess: detecting circular plasmid contigs..."
+            workflow/scripts/detect_circular_contigs.py -b {output.contig_bam} -o {output.circular_txt} >> {log} 2>&1
             
-            # run mobmess to infer plasmid systems (|| true: tolerates edge-case crashes on small inputs)
-            mobmess systems --sequences {input.plas_contigs} --complete {output.circular_txt} --output $(dirname {output.mobmess})/{wildcards.sample}-mobmess --threads {resources.threads} || true
+            echo "[{wildcards.sample}] MobMess: inferring plasmid systems..."
+            mobmess systems --sequences {input.plas_contigs} --complete {output.circular_txt} --output $(dirname {output.mobmess})/{wildcards.sample}-mobmess --threads {resources.threads} >> {log} 2>&1 || true
             # ensure output file always exists
             [ -f {output.mobmess} ] || touch {output.mobmess}
+            echo "[{wildcards.sample}] MobMess: done"
         fi
         """
 
@@ -158,19 +172,23 @@ rule init_mmseqs_db:
     resources:
         mem_mb  = lambda wc: res(8000, 4000),
         threads = 1,
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "init_mmseqs_db.log")
     shell:
         """
         mkdir -p $(dirname {output.done})
 
         if [ "{params.test_mode}" = "True" ]; then
+            echo "MMseqs2: building test taxonomy database..."
             mkdir -p {params.test_tax_dir}/tmp
             touch {params.test_tax_dir}/merged.dmp
-            mmseqs createdb {params.test_fasta} {params.db_prefix}
+            mmseqs createdb {params.test_fasta} {params.db_prefix} >> {log} 2>&1
             mmseqs createtaxdb {params.db_prefix} {params.test_tax_dir}/tmp \
                 --ncbi-tax-dump {params.test_tax_dir} \
-                --tax-mapping-file {params.test_mapping}
-            mmseqs createindex {params.db_prefix} {params.test_tax_dir}/tmp --search-type 2
+                --tax-mapping-file {params.test_mapping} >> {log} 2>&1
+            mmseqs createindex {params.db_prefix} {params.test_tax_dir}/tmp --search-type 2 >> {log} 2>&1
             rm -rf {params.test_tax_dir}/tmp
+            echo "MMseqs2: test database ready"
         else
             if [ ! -f "{params.db_prefix}.dbtype" ]; then
                 echo "ERROR: UniRef50 MMseqs2 database not found at {params.db_prefix}"
@@ -194,11 +212,15 @@ rule prodigal:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = 1,
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.prodigal.log")
     conda: "../envs/contigs.yaml"
     shell:
         """
         mkdir -p $(dirname {output.faa})
-        prodigal -i {input.contigs} -a {output.faa} -f gff -o {output.gff} -p meta -q
+        echo "[{wildcards.sample}] Prodigal: predicting genes..."
+        prodigal -i {input.contigs} -a {output.faa} -f gff -o {output.gff} -p meta -q >> {log} 2>&1
+        echo "[{wildcards.sample}] Prodigal: done"
         """
 
 # ---------------------------------------------------------------------------
@@ -216,19 +238,23 @@ rule contig_amr:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.contig_amr.log")
     conda: "../envs/mags.yaml"
     shell:
         """
         mkdir -p $(dirname {output.tsv})
+        echo "[{wildcards.sample}] AMRFinderPlus: annotating contigs..."
         amrfinder \
             -n {input.contigs} \
             -p {input.faa} \
             -g {input.gff} \
             --threads {resources.threads} \
             -o {output.tsv} \
-            --annotation_format prodigal 2>/dev/null || true
+            --annotation_format prodigal >> {log} 2>&1 || true
         # Create empty file if no hits found or amrfinder failed on mock data
         [ -f {output.tsv} ] || touch {output.tsv}
+        echo "[{wildcards.sample}] AMRFinderPlus: done"
         """
 
 # ---------------------------------------------------------------------------
@@ -239,14 +265,18 @@ rule init_mge_tool:
     """Install MobileElementFinder via pip --no-deps (conda provides all deps)."""
     output:
         done = os.path.join(output_dir, "data", "mge_contigs", ".mef_install.done")
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "init_mge_tool.log")
     conda: "../envs/contigs.yaml"
     shell:
         """
         mkdir -p $(dirname {output.done})
-        pip install --no-deps --quiet mypy-extensions
-        pip install --no-deps --quiet MGEdb==1.1.1
-        pip install --no-deps --quiet MobileElementFinder
+        echo "MobileElementFinder: installing..."
+        pip install --no-deps --quiet mypy-extensions >> {log} 2>&1
+        pip install --no-deps --quiet MGEdb==1.1.1 >> {log} 2>&1
+        pip install --no-deps --quiet MobileElementFinder >> {log} 2>&1
         touch {output.done}
+        echo "MobileElementFinder: installed"
         """
 
 rule mge_annotation:
@@ -260,22 +290,26 @@ rule mge_annotation:
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mge_annotation.log")
     conda: "../envs/contigs.yaml"
     shell:
         """
         mkdir -p {output.tmp}
         PREFIX=$(dirname {output.tsv})/{wildcards.sample}_mge
+        echo "[{wildcards.sample}] MobileElementFinder: annotating MGEs..."
         mefinder find \
             --contig {input.contigs} \
             --temp-dir {output.tmp} \
             --threads {resources.threads} \
-            "$PREFIX" || true
+            "$PREFIX" >> {log} 2>&1 || true
         # mefinder writes PREFIX.csv; rename to expected .tsv
         if [ -f "${{PREFIX}}.csv" ]; then
             mv "${{PREFIX}}.csv" {output.tsv}
         else
             touch {output.tsv}
         fi
+        echo "[{wildcards.sample}] MobileElementFinder: done"
         """
 
 # ---------------------------------------------------------------------------
@@ -296,10 +330,13 @@ rule mmseqs_taxonomy:
     resources:
         mem_mb  = lambda wc: res(64000, 4000),
         threads = lambda wc: res(32, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mmseqs_taxonomy.log")
     conda: "../envs/contigs.yaml"
     shell:
         """
         mkdir -p $(dirname {output.lca}) {params.tmp}
+        echo "[{wildcards.sample}] MMseqs2: taxonomy classification..."
         mmseqs easy-taxonomy \
             {input.contigs} \
             {params.db_prefix} \
@@ -310,11 +347,12 @@ rule mmseqs_taxonomy:
             --format-output "query,taxid,taxname,taxlineage" \
             --orf-filter 0 \
             -s 2 \
-            > /dev/null 2>&1 || true
+            >> {log} 2>&1 || true
         # easy-taxonomy writes {{prefix}}_lca.tsv; touch if absent (no hits or search failed)
         mv $(dirname {output.lca})/{wildcards.sample}_lca.tsv {output.lca} 2>/dev/null || true
         rm -rf {params.tmp}
         [ -f {output.lca} ] || touch {output.lca}
+        echo "[{wildcards.sample}] MMseqs2: done"
         """
 
 # ---------------------------------------------------------------------------
@@ -338,6 +376,8 @@ rule contig_abundance:
     resources:
         mem_mb  = lambda wc: res(20000, 4000),
         threads = lambda wc: res(16, 4),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.contig_abundance.log")
     conda: "../envs/contigs.yaml"
     script:
         "../scripts/contig_abundance.py"
@@ -361,6 +401,8 @@ rule contig_summary:
         samples    = samples,
         output_dir = output_dir
     conda: "../envs/contigs.yaml"
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "contig_summary.log")
     script:
         "../scripts/contig_summary.py"
         

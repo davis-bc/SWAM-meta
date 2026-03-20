@@ -27,5 +27,7 @@ rule amr_unified:
     params:
         contig_amr_dir = os.path.join(output_dir, "data", "amr_contigs")
     conda: "../envs/contigs.yaml"
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "amr_unified.log")
     script:
         "../scripts/amr_unified.py"

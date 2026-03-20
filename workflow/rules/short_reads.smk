@@ -17,6 +17,8 @@ rule initiate_dbs:
         test_human       = os.path.join(_REPO, "test", "dbs", "human", "human_mini.fna.gz"),
         test_markers_dir = os.path.join(_REPO, "test", "dbs", "markers"),
         markers_dir      = config.get("markers_db", ""),
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "initiate_dbs.log")
     conda: "../envs/shortreads.yaml"
     shell:
         """
@@ -24,54 +26,54 @@ rule initiate_dbs:
 
         if [ "{params.test_mode}" = "True" ]; then
 
-            # Test mode: index the pre-generated mini AMRFinderPlus FASTA
+            echo "initiate_dbs: indexing AMRFinderPlus database..."
             cp {params.test_amr_fa} $(dirname {output.afp_db})/AMR_CDS.fa
             kma index -i $(dirname {output.afp_db})/AMR_CDS.fa \
-                      -o $(dirname {output.afp_db})/afp_db > /dev/null 2>&1
+                      -o $(dirname {output.afp_db})/afp_db >> {log} 2>&1
             touch {output.afp_db}
-
             cp {params.test_meta} {output.afp_metadata}
 
+            echo "initiate_dbs: building SCG DIAMOND database..."
             diamond makedb --in {params.scg_db} \
-                           -d $(dirname {output.scg_db})/scg_db --quiet
+                           -d $(dirname {output.scg_db})/scg_db --quiet >> {log} 2>&1
             touch {output.scg_db}
-
             cp {params.test_human} {output.h_genome}
 
+            echo "initiate_dbs: indexing anthropogenic markers..."
             cat {params.test_markers_dir}/pBI143.fasta {params.test_markers_dir}/crAss001.fasta \
                 > $(dirname {output.afp_db})/markers.fa
             kma index -i $(dirname {output.afp_db})/markers.fa \
-                      -o $(dirname {output.afp_db})/markers_db > /dev/null 2>&1
+                      -o $(dirname {output.afp_db})/markers_db >> {log} 2>&1
             touch {output.markers_db}
 
         else
 
-            # Production: download latest AMRFinderPlus database and metadata
-            echo "downloading latest AMRFinderPlus database and metadata"
-            wget -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa > /dev/null 2>&1
-            wget -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt > /dev/null 2>&1
+            echo "initiate_dbs: downloading AMRFinderPlus database..."
+            wget -q -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa >> {log} 2>&1
+            wget -q -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt >> {log} 2>&1
 
-            echo "indexing AMRFinderPlus database"
+            echo "initiate_dbs: indexing AMRFinderPlus database..."
             kma index -i $(dirname {output.afp_db})/AMR_CDS.fa \
-                      -o $(dirname {output.afp_db})/afp_db > /dev/null 2>&1
+                      -o $(dirname {output.afp_db})/afp_db >> {log} 2>&1
             touch {output.afp_db}
 
-            echo "making diamond database for single copy genes"
+            echo "initiate_dbs: building SCG DIAMOND database..."
             diamond makedb --in {params.scg_db} \
-                           -d $(dirname {output.scg_db})/scg_db > /dev/null 2>&1
+                           -d $(dirname {output.scg_db})/scg_db --quiet >> {log} 2>&1
             touch {output.scg_db}
 
-            echo "downloading human reference genome for host filtering"
-            wget -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz > /dev/null 2>&1
+            echo "initiate_dbs: downloading human reference genome..."
+            wget -q -P $(dirname {output.afp_db}) https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz >> {log} 2>&1
 
-            echo "building KMA index for anthropogenic markers (pBI143, crAss001)"
+            echo "initiate_dbs: indexing anthropogenic markers (pBI143, crAss001)..."
             cat {params.markers_dir}/pBI143.fasta {params.markers_dir}/crAss001.fasta \
                 > $(dirname {output.afp_db})/markers.fa
             kma index -i $(dirname {output.afp_db})/markers.fa \
-                      -o $(dirname {output.afp_db})/markers_db > /dev/null 2>&1
+                      -o $(dirname {output.afp_db})/markers_db >> {log} 2>&1
             touch {output.markers_db}
 
         fi
+        echo "initiate_dbs: done"
         """
 
 # ----------------------------------------------------
@@ -100,6 +102,8 @@ rule short_reads:
         threads = lambda wc: res(16, 4),
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.short_reads.txt")
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.short_reads.log")
     conda: "../envs/shortreads.yaml"
     shell:
         """
@@ -109,44 +113,44 @@ rule short_reads:
         TMP_R1="$TMPDIR/{wildcards.sample}_R1.fastq.gz"
         TMP_R2="$TMPDIR/{wildcards.sample}_R2.fastq.gz"
         
-        # run fastp using temporary files
-        echo "cleaning reads with fastp"
-        fastp -i {input.r1} -I {input.r2} -o "$TMP_R1" -O "$TMP_R2" --html /dev/null/ --json {output.json}
+        echo "[{wildcards.sample}] fastp: quality filtering reads..."
+        fastp -i {input.r1} -I {input.r2} -o "$TMP_R1" -O "$TMP_R2" --html /dev/null --json {output.json} >> {log} 2>&1
+        echo "[{wildcards.sample}] fastp: done"
 
-        # filter out human reads, ensure final output has equal number of reads
-        echo "filtering out human DNA"
-        minimap2 -t {resources.threads} -ax sr {input.h_genome} "$TMP_R1" "$TMP_R2" | samtools view -u -f 12 -F 256 - \
+        echo "[{wildcards.sample}] minimap2: filtering host reads..."
+        minimap2 -t {resources.threads} -ax sr {input.h_genome} "$TMP_R1" "$TMP_R2" 2>> {log} \
+        | samtools view -u -f 12 -F 256 - 2>> {log} \
         | samtools fastq -n -1 >(pigz -p {resources.threads} > {output.r1_clean}) \
                  -2 >(pigz -p {resources.threads} > {output.r2_clean}) \
-                 -0 /dev/null -
-        
+                 -0 /dev/null - 2>> {log}
         rm -f "$TMP_R1" "$TMP_R2"
+        echo "[{wildcards.sample}] minimap2: done"
         
-        # run KMA against AMRFinderPlus
-        echo "aligning reads to AMRFinderPlus with KMA"
-        kma -ipe {output.r1_clean} {output.r2_clean} -o $(dirname {output.afp})/{wildcards.sample}.afp -t_db $(dirname {input.afp_db})/afp_db -1t1 -t {resources.threads}
+        echo "[{wildcards.sample}] KMA: aligning to AMRFinderPlus..."
+        kma -ipe {output.r1_clean} {output.r2_clean} -o $(dirname {output.afp})/{wildcards.sample}.afp -t_db $(dirname {input.afp_db})/afp_db -1t1 -t {resources.threads} >> {log} 2>&1
+        echo "[{wildcards.sample}] KMA: done (AMR)"
         
-        # run KMA against anthropogenic markers (pBI143, crAss001)
-        echo "aligning reads to anthropogenic markers with KMA"
-        kma -ipe {output.r1_clean} {output.r2_clean} -o $(dirname {output.markers})/{wildcards.sample}.markers -t_db $(dirname {input.markers_db})/markers_db -1t1 -t {resources.threads}
+        echo "[{wildcards.sample}] KMA: aligning to anthropogenic markers..."
+        kma -ipe {output.r1_clean} {output.r2_clean} -o $(dirname {output.markers})/{wildcards.sample}.markers -t_db $(dirname {input.markers_db})/markers_db -1t1 -t {resources.threads} >> {log} 2>&1
+        echo "[{wildcards.sample}] KMA: done (markers)"
         
-        # Run diamond against single-copy genes using a concat temp file
-        echo "aligning reads to single copy genes with diamond"
+        echo "[{wildcards.sample}] DIAMOND: aligning to single-copy genes..."
         TMP_SE="$TMPDIR/{wildcards.sample}_SE.fastq.gz"
         cat {output.r1_clean} {output.r2_clean} > "$TMP_SE"
         diamond blastx --db $(dirname {input.scg_db})/scg_db \
             --query "$TMP_SE" \
             --out {output.scgs} \
             --outfmt 6 qseqid sseqid pident length evalue bitscore slen \
-            --fast --max-target-seqs 1 --threads {resources.threads} --quiet
+            --fast --max-target-seqs 1 --threads {resources.threads} --quiet >> {log} 2>&1
         rm -f "$TMP_SE"
+        echo "[{wildcards.sample}] DIAMOND: done"
         
-        # run nonpareil to calculate metagenomic coverage
-        echo "estimating metagenomic coverage with nonpareil"
+        echo "[{wildcards.sample}] nonpareil: estimating metagenomic coverage..."
         base=$(basename {output.r1_clean} .gz)
         gunzip -c {output.r1_clean} > $(dirname {output.nonpareil})/$base
-        nonpareil -s $(dirname {output.nonpareil})/$base -T kmer -f fastq -b $(dirname {output.nonpareil})/{wildcards.sample}
+        nonpareil -s $(dirname {output.nonpareil})/$base -T kmer -f fastq -b $(dirname {output.nonpareil})/{wildcards.sample} >> {log} 2>&1
         rm $(dirname {output.nonpareil})/$base
+        echo "[{wildcards.sample}] nonpareil: done"
         
         """
         
@@ -167,5 +171,7 @@ rule short_reads_summary:
         afp         = os.path.join(output_dir, "short_reads_output.csv"),
         amr_summary = os.path.join(output_dir, "markers_cpg.csv")
     conda: "../envs/Renv.yaml"
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "short_reads_summary.log")
     script:
-        "../scripts/short_reads_processing.R"   
+        "../scripts/short_reads_processing.R"
