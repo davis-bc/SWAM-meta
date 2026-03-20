@@ -390,3 +390,29 @@ Dry-run job counts for all mode combinations (all validated this session):
 ### Known issues / next steps
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned (skipped in test mode).
 - `slurm_account` and `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2026-03-20 (session 15)
+
+### What was done
+
+**SLURM profile runtime fix:**
+- Both `config/slurm/small-batch/config.yaml` and `config/slurm/large-batch/config.yaml` had runtime values in `d-hh:mm:ss` string format (invalid for `snakemake-executor-plugin-slurm`). Converted all values to integer minutes: 240, 360, 480, 600, 1440, 2160, 4320.
+
+**README streamlining:**
+- Removed the separate "Requirements" section; merged into "Installation" with a single conda install command that always includes both `snakemake>=8` and `snakemake-executor-plugin-slurm`.
+- Removed duplicate conda install lines from the SLURM section.
+- Improved the database setup section with direct download URLs for UniRef50 (UniProt FTP), NCBI taxdump, and corrected the GTDB-tk downloader call to `conda run -n gtdbtk download-db.sh`. Added METABOLIC git clone command.
+- Simplified SLURM section to a 2-step pattern (edit account/partition, then submit).
+- The expanded "Prepare required databases" table was drafted but reverted at user request; user has separate plans for that section.
+
+### Current pipeline state
+- No workflow logic changes.
+- SLURM profiles now use valid runtime syntax (integer minutes).
+- README installation is now a single command with no duplicates.
+
+### Known issues / next steps
+- Database section in README is intentionally minimal — user has plans to expand it separately.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` and `slurm_partition` placeholders still need filling before cluster use.
