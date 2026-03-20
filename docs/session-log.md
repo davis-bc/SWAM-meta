@@ -367,3 +367,26 @@ Dry-run job counts for all mode combinations (all validated this session):
 
 ### Known issues / next steps
 - The README now reflects the plugin-based profile setup, but users still need to set `slurm_account` and `slurm_partition` in both SLURM profile files before cluster execution.
+
+---
+
+## 2026-03-20 (session 14)
+
+### What was done
+- Added `log:` directive to every rule across all four rule files (`short_reads.smk`, `contigs.smk`, `mags.smk`, `summary.smk`).
+- Log files go to `{output_dir}/data/QAQC/logs/` — named `{sample}.rulename.log` for per-sample rules, `rulename.log` for global rules.
+- Redirected all tool stdout/stderr to the log with `>> {log} 2>&1` (append), keeping logs for debugging without flooding the terminal.
+- For multi-command pipelines (minimap2 → samtools), used `2>> {log}` per command to silence each stage's stderr while preserving the pipe.
+- Added/updated echo messages throughout with the format `[{wildcards.sample}] tool: action...` and `[{wildcards.sample}] tool: done` so the terminal only shows brief start/stop updates.
+- Fixed a minor pre-existing issue: `fastp --html /dev/null/` (spurious trailing slash) → `--html /dev/null`.
+- Script-based rules (`short_reads_summary`, `contig_abundance`, `contig_summary`, `amr_unified`) also received `log:` directives — Snakemake automatically redirects script stderr/stdout to the log file.
+- Validated with `snakemake -n --config test=True` — dry run exits 0, DAG builds correctly.
+
+### Current pipeline state
+- Workflow logic unchanged; only output verbosity and log routing updated.
+- Terminal output during a run will show only brief `[sample] tool: action` progress echoes.
+- Full tool output (including errors) is captured in per-rule log files under `data/QAQC/logs/`.
+
+### Known issues / next steps
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned (skipped in test mode).
+- `slurm_account` and `slurm_partition` placeholders need filling before cluster use.
