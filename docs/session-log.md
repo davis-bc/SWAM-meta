@@ -416,3 +416,47 @@ Dry-run job counts for all mode combinations (all validated this session):
 - Database section in README is intentionally minimal — user has plans to expand it separately.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` and `slurm_partition` placeholders still need filling before cluster use.
+
+---
+
+## 2026-03-20 (session 16)
+
+### What was done
+
+**Full database automation — all DBs now live in `SWAM-meta/dbs/` (gitignored):**
+
+- `common.smk`: removed `config["scg_db"]`, `config["uniref50_db"]`, `config["markers_db"]` test-mode overrides; added module-level constants `_DBS_DIR`, `_SCG_DB`, `_UNIREF50_DB`, `_CHECKM2_DB`, `_METABOLIC_DIR` pointing to `SWAM-meta/dbs/` (test mode uses `test/dbs/` as source inputs but writes built indices to the same `dbs/` dir).
+
+- `config/config.yaml`: stripped `scg_db`, `uniref50_db`, `markers_db`, `checkm2_db`, `metabolic_dir`. Now only `in_dir`, `out_dir`, and `gtdbtk_db` are path keys.
+
+- `initiate_dbs` (short_reads.smk): outputs moved to `_DBS_DIR`; added `metabolic_done` sentinel; production shell now auto-downloads pBI143 (`U30316.1`) and crAss001 (`NC_049977.1`) via NCBI Entrez efetch API; git-clones METABOLIC (conditioned on `skip_metabolic`).
+
+- `init_genomad` (contigs.smk): sentinel and DB directory moved from `output_dir/data/genomad/` to `_DBS_DIR/`.
+
+- `init_mmseqs_db` (contigs.smk): removed from `localrules`; production branch now auto-downloads UniRef50 FASTA (~9 GB) and NCBI taxdump, builds MMseqs2 taxonomy DB; resources increased to 16 threads / 32 GB.
+
+- `init_checkm2_db` (new localrule in mags.smk): downloads CheckM2 DB (~3 GB) via `checkm2 database --download`; sentinel at `_DBS_DIR/.checkm2.done`; respects `skip_checkm2`.
+
+- `mag_qc`: added `checkm2_done` input; `db_path` now uses `_CHECKM2_DB`.
+
+- `mag_metabolism`: added `metabolic_done` input; `metabolic_dir` now uses `_METABOLIC_DIR`.
+
+- `amr_unified` (summary.smk): catalog input path updated to `_DBS_DIR/ReferenceGeneCatalog.txt`.
+
+- `Snakefile`: replaced `init_mmseqs_db` with `init_checkm2_db` in `localrules`.
+
+- SLURM profiles: added `init_mmseqs_db` to `set-threads` (16) and `set-resources` (32 GB, 4320 min) in both `small-batch` and `large-batch`.
+
+- `workflow/resources/README.md`: new file documenting that `SCGs_40_All.fasta` must be placed in `workflow/resources/` before production use.
+
+- README: simplified production setup to 2 steps — copy SCG FASTA + fill in `in_dir`/`out_dir`/`gtdbtk_db`.
+
+### Current pipeline state
+- Dry run passes (exit 0, 36 jobs) in test mode.
+- HEAD: `cd08ce4` — pushed to `origin/main`.
+- `SWAM-meta/dbs/` is the persistent home for all auto-managed databases.
+
+### Known issues / next steps
+- `SCGs_40_All.fasta` must still be copied manually to `workflow/resources/` — git LFS could track it if needed.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders still need filling before cluster use.
