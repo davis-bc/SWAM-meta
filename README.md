@@ -21,17 +21,6 @@ The rule dependency graph below is generated directly from `workflow/Snakefile`,
 
 ---
 
-## Requirements
-
-- [Conda](https://docs.conda.io/) or [Mamba](https://mamba.readthedocs.io/) (Mamba recommended for faster env solving)
-- [Snakemake](https://snakemake.readthedocs.io/) ≥ 8
-
-All other tools are installed automatically into isolated conda environments on first run (`--use-conda`).
-
-> **Note:** The default Snakemake MILP scheduler requires the `cbc` solver. If it is not installed, add `--scheduler greedy` to all `snakemake` commands.
-
----
-
 ## Installation
 
 ```bash
@@ -39,19 +28,15 @@ git clone https://github.com/<org>/SWAM-meta.git
 cd SWAM-meta
 ```
 
-Install Snakemake itself in your base environment before running the workflow:
+Install Snakemake and the SLURM executor plugin into your base conda environment:
 
 ```bash
-conda install "snakemake>=8"
+conda install -c conda-forge -c bioconda "snakemake>=8" snakemake-executor-plugin-slurm
 ```
 
-If you plan to run on SLURM with the bundled profiles, also install the executor plugin:
+> **Always use `--scheduler greedy`** when running Snakemake. The default MILP scheduler requires the `cbc` solver which is not installed.
 
-```bash
-conda install "snakemake>=8" snakemake-executor-plugin-slurm
-```
-
-All workflow tools are then installed automatically into isolated conda environments on first run via `--use-conda`.
+All workflow tools are installed automatically into isolated conda environments on first run via `--use-conda`.
 
 ---
 
@@ -75,37 +60,106 @@ Expected runtime: ~30–60 minutes on a laptop. Outputs are written to `test/out
 
 ### 1. Prepare required databases
 
-#### AMRFinderPlus + human genome
-Downloaded automatically on first run by the `initiate_dbs` rule (~1.2 GB total). No manual action needed.
+The table below lists every external file the workflow needs. Steps marked **auto** require no action — the `initiate_dbs` rule downloads and indexes them on first run.
 
-#### 40 single-copy gene database (SCGs)
-Provide the path to `SCGs_40_All.fasta` in `config/config.yaml` under `scg_db`.
+| Database | Config key | How to obtain |
+|----------|------------|---------------|
+| AMRFinderPlus CDS + metadata | *(auto)* | Downloaded automatically from NCBI (~300 MB) |
+| Human reference genome GRCh38 | *(auto)* | Downloaded automatically from NCBI (~900 MB) |
+| 40 single-copy genes | `scg_db` | `SCGs_40_All.fasta` — see below |
+| Anthropogenic markers | `markers_db` | `pBI143.fasta` + `crAss001.fasta` — see below |
+| UniRef50 MMseqs2 taxonomy DB | `uniref50_db` | Build from UniProt FASTA — see below |
+| GTDB-tk reference data | `gtdbtk_db` | *(optional)* |
+| METABOLIC | `metabolic_dir` | *(optional)* |
+| CheckM2 diamond DB | `checkm2_db` | *(optional)* |
 
-#### Anthropogenic markers (pBI143, crAss001)
-Provide the path to a directory containing `pBI143.fasta` and `crAss001.fasta` under `markers_db`.
+---
 
-#### UniRef50 MMseqs2 taxonomy database (for contig taxonomy)
+#### Single-copy gene database (`scg_db`)
 
-```bash
-# Download UniRef50 FASTA from https://www.uniprot.org/uniref/
-mmseqs createdb uniref50.fasta /path/to/uniref50_mmseqs
-mmseqs createtaxdb /path/to/uniref50_mmseqs tmp --ncbi-tax-dump /path/to/taxdump
-mmseqs createindex /path/to/uniref50_mmseqs tmp --search-type 2
+`SCGs_40_All.fasta` contains 40 universal single-copy marker genes used to estimate genome-equivalent coverage. Obtain from the lab shared data directory or download from the [SWAM-g companion data repository](https://github.com/bhattlab/SWAM-g).
+
+```yaml
+scg_db: /path/to/SCGs_40_All.fasta
 ```
 
-Set `uniref50_db: /path/to/uniref50_mmseqs` in `config/config.yaml`.
+---
+
+#### Anthropogenic markers (`markers_db`)
+
+Two FASTA files are required in a single directory:
+
+- **pBI143** — resistance plasmid marker ([GenBank EU855169](https://www.ncbi.nlm.nih.gov/nuccore/EU855169))
+- **crAss001** — crAssphage marker ([GenBank MH675552](https://www.ncbi.nlm.nih.gov/nuccore/MH675552))
+
+```bash
+# Download both sequences from NCBI and save to a directory
+mkdir -p /path/to/markers
+# Download via NCBI Entrez (requires ncbi-datasets-cli or efetch)
+efetch -db nuccore -id EU855169 -format fasta > /path/to/markers/pBI143.fasta
+efetch -db nuccore -id MH675552 -format fasta > /path/to/markers/crAss001.fasta
+```
+
+```yaml
+markers_db: /path/to/markers
+```
+
+---
+
+#### UniRef50 MMseqs2 taxonomy database (`uniref50_db`)
+
+This is the largest manual setup step (~75 GB disk, ~4–8 h to build). Only required for contig taxonomy.
+
+```bash
+# 1. Download UniRef50 FASTA from UniProt
+wget https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz
+
+# 2. Download NCBI taxonomy dump
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
+mkdir taxdump && tar -xzf taxdump.tar.gz -C taxdump
+
+# 3. Build the MMseqs2 database (run inside the contigs conda env, or with mmseqs2 on PATH)
+mmseqs createdb uniref50.fasta.gz /path/to/uniref50_mmseqs
+mmseqs createtaxdb /path/to/uniref50_mmseqs taxdump/tmp \
+    --ncbi-tax-dump taxdump \
+    --tax-mapping-file taxdump/nodes.dmp
+mmseqs createindex /path/to/uniref50_mmseqs taxdump/tmp --search-type 2
+```
+
+```yaml
+uniref50_db: /path/to/uniref50_mmseqs
+```
+
+---
 
 #### GTDB-tk reference data *(optional)*
 
 ```bash
-download-db.sh /path/to/gtdbtk_db
+# Uses the GTDB-tk built-in downloader (~66 GB)
+conda run -n gtdbtk download-db.sh /path/to/gtdbtk_db
 ```
 
-Set `gtdbtk_db: /path/to/gtdbtk_db`. To skip GTDB-tk entirely, set `skip_gtdbtk: True`.
+```yaml
+gtdbtk_db: /path/to/gtdbtk_db
+```
+
+To skip GTDB-tk entirely: `skip_gtdbtk: True`
+
+---
 
 #### METABOLIC *(optional)*
 
-Clone the [METABOLIC repository](https://github.com/AnantharamanLab/METABOLIC) and set `metabolic_dir` to the cloned path. To skip, set `skip_metabolic: True`.
+```bash
+git clone https://github.com/AnantharamanLab/METABOLIC.git /path/to/METABOLIC
+```
+
+```yaml
+metabolic_dir: /path/to/METABOLIC
+```
+
+To skip: `skip_metabolic: True`
+
+---
 
 #### CheckM2 *(optional)*
 
@@ -113,7 +167,11 @@ Clone the [METABOLIC repository](https://github.com/AnantharamanLab/METABOLIC) a
 checkm2 database --download --path /path/to/checkm2_db
 ```
 
-Set `checkm2_db: /path/to/checkm2_db/CheckM2_database/uniref100.KO.1.dmnd`. To skip, set `skip_checkm2: True`.
+```yaml
+checkm2_db: /path/to/checkm2_db/CheckM2_database/uniref100.KO.1.dmnd
+```
+
+To skip: `skip_checkm2: True`
 
 ---
 
@@ -170,40 +228,31 @@ The first run downloads and indexes the AMRFinderPlus database (~300 MB) and hum
 
 ### 4. Running on SLURM
 
-SWAM-meta uses
-[snakemake-executor-plugin-slurm](https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html)
-with two SLURM profiles:
+SWAM-meta includes two SLURM profiles using [snakemake-executor-plugin-slurm](https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html):
 
-| Profile | Recommended for | Behavior |
-|---------|------------------|----------|
-| `config/slurm/large-batch` | **>=50 samples** | Lightweight annotation/QC rules are batched across multiple samples per Slurm job; heavy assembly, taxonomy, and binning rules still run one sample per job |
-| `config/slurm/small-batch` | **<50 samples** | Each sample-parallel rule runs as its own individual Slurm job |
+| Profile | Use when |
+|---------|----------|
+| `config/slurm/small-batch` | < 50 samples — each rule runs as its own job |
+| `config/slurm/large-batch` | ≥ 50 samples — lightweight annotation rules are batched across samples |
 
-Install Snakemake 8+ and the executor plugin in your base environment:
-
-```bash
-conda install "snakemake>=8" snakemake-executor-plugin-slurm
-```
-
-Edit both profile configs and fill in your account and partition:
+**Step 1.** Open both profile files and fill in your cluster account and partition:
 
 ```yaml
+# config/slurm/small-batch/config.yaml  (and large-batch/config.yaml)
 default-resources:
-  slurm_account: "my_account"      # your HPC allocation
-  slurm_partition: "'highmem'"     # target partition (note inner quotes for SLURM)
+  slurm_account: "my_account"
+  slurm_partition: "standard"
 ```
 
-Then choose the appropriate profile when submitting:
-
-```bash
-snakemake --profile config/slurm/large-batch
-```
+**Step 2.** Submit:
 
 ```bash
 snakemake --profile config/slurm/small-batch
+# or
+snakemake --profile config/slurm/large-batch
 ```
 
-Both profiles set `scheduler: greedy`, manage per-rule `threads`, `mem_mb`, and `runtime` explicitly in profile YAML, and keep resource tuning out of the `.smk` rule files. There is no local profile in this repository due to resource constraints; local runs should continue using the explicit `--cores` commands shown above.
+Both profiles set `scheduler: greedy`, `use-conda: true`, and all per-rule thread/memory/runtime limits. No additional flags are needed.
 
 ---
 

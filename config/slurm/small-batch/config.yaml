@@ -27,7 +27,7 @@ default-resources:
   slurm_account: ""
   slurm_partition: ""
   mem_mb: 4000
-  runtime: "0-06:00:00"
+  runtime: 360
 
 # No groups defined — each sample is submitted as an individual Slurm job.
 
@@ -63,62 +63,62 @@ set-resources:
   # --- Short reads ---
   short_reads:
     mem_mb: 20000
-    runtime: "0-10:00:00"
+    runtime: 600
 
   # --- Assembly ---
   contigs:
     mem_mb: 150000
-    runtime: "3-00:00:00"
+    runtime: 4320
 
   # --- Contig classification ---
   genomad:
     mem_mb: 150000
-    runtime: "3-00:00:00"
+    runtime: 4320
   mobmess:
     mem_mb: 150000
-    runtime: "1-00:00:00"
+    runtime: 1440
 
   # --- Contig annotation ---
   prodigal:
     mem_mb: 16000
-    runtime: "0-04:00:00"
+    runtime: 240
   contig_amr:
     mem_mb: 16000
-    runtime: "0-06:00:00"
+    runtime: 360
   mge_annotation:
     mem_mb: 16000
-    runtime: "0-06:00:00"
+    runtime: 360
   mmseqs_taxonomy:
     mem_mb: 64000
-    runtime: "1-00:00:00"
+    runtime: 1440
   contig_abundance:
     mem_mb: 20000
-    runtime: "0-06:00:00"
+    runtime: 360
 
   # --- MAG binning / heavy per-sample jobs ---
   bin:
     mem_mb: 150000
-    runtime: "1-00:00:00"
+    runtime: 1440
   mag_taxonomy:
     mem_mb: 150000
-    runtime: "1-12:00:00"
+    runtime: 2160
   mag_metabolism:
     mem_mb: 150000
-    runtime: "1-00:00:00"
+    runtime: 1440
 
   # --- MAG annotation / QC ---
   mag_prodigal:
     mem_mb: 16000
-    runtime: "0-06:00:00"
+    runtime: 360
   mag_amr:
     mem_mb: 16000
-    runtime: "0-06:00:00"
+    runtime: 360
   mag_mge:
     mem_mb: 16000
-    runtime: "0-06:00:00"
+    runtime: 360
   mag_qc:
     mem_mb: 32000
-    runtime: "0-08:00:00"
+    runtime: 480
   mag_abundance:
     mem_mb: 32000
-    runtime: "0-04:00:00"
+    runtime: 240
