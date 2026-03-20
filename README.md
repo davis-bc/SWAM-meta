@@ -60,92 +60,39 @@ Expected runtime: ~30–60 minutes on a laptop. Outputs are written to `test/out
 
 ### 1. Prepare required databases
 
-The table below lists every external file the workflow needs. Steps marked **auto** require no action — the `initiate_dbs` rule downloads and indexes them on first run.
+#### AMRFinderPlus + human genome
+Downloaded automatically on first run by the `initiate_dbs` rule (~1.2 GB total). No manual action needed.
 
-| Database | Config key | How to obtain |
-|----------|------------|---------------|
-| AMRFinderPlus CDS + metadata | *(auto)* | Downloaded automatically from NCBI (~300 MB) |
-| Human reference genome GRCh38 | *(auto)* | Downloaded automatically from NCBI (~900 MB) |
-| 40 single-copy genes | `scg_db` | `SCGs_40_All.fasta` — see below |
-| Anthropogenic markers | `markers_db` | `pBI143.fasta` + `crAss001.fasta` — see below |
-| UniRef50 MMseqs2 taxonomy DB | `uniref50_db` | Build from UniProt FASTA — see below |
-| GTDB-tk reference data | `gtdbtk_db` | *(optional)* |
-| METABOLIC | `metabolic_dir` | *(optional)* |
-| CheckM2 diamond DB | `checkm2_db` | *(optional)* |
-
----
-
-#### Single-copy gene database (`scg_db`)
-
-`SCGs_40_All.fasta` contains 40 universal single-copy marker genes used to estimate genome-equivalent coverage. Obtain from the lab shared data directory or download from the [SWAM-g companion data repository](https://github.com/bhattlab/SWAM-g).
-
-```yaml
-scg_db: /path/to/SCGs_40_All.fasta
-```
-
----
+#### 40 single-copy gene database (`scg_db`)
+Provide the path to `SCGs_40_All.fasta` in `config/config.yaml` under `scg_db`. Obtain from the lab shared data directory or the [SWAM-g companion data repository](https://github.com/bhattlab/SWAM-g).
 
 #### Anthropogenic markers (`markers_db`)
-
-Two FASTA files are required in a single directory:
-
-- **pBI143** — resistance plasmid marker ([GenBank EU855169](https://www.ncbi.nlm.nih.gov/nuccore/EU855169))
-- **crAss001** — crAssphage marker ([GenBank MH675552](https://www.ncbi.nlm.nih.gov/nuccore/MH675552))
-
-```bash
-# Download both sequences from NCBI and save to a directory
-mkdir -p /path/to/markers
-# Download via NCBI Entrez (requires ncbi-datasets-cli or efetch)
-efetch -db nuccore -id EU855169 -format fasta > /path/to/markers/pBI143.fasta
-efetch -db nuccore -id MH675552 -format fasta > /path/to/markers/crAss001.fasta
-```
-
-```yaml
-markers_db: /path/to/markers
-```
-
----
+Provide the path to a directory containing `pBI143.fasta` and `crAss001.fasta` under `markers_db`.
 
 #### UniRef50 MMseqs2 taxonomy database (`uniref50_db`)
 
-This is the largest manual setup step (~75 GB disk, ~4–8 h to build). Only required for contig taxonomy.
-
 ```bash
-# 1. Download UniRef50 FASTA from UniProt
+# 1. Download UniRef50 FASTA and NCBI taxonomy dump
 wget https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz
-
-# 2. Download NCBI taxonomy dump
 wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
 mkdir taxdump && tar -xzf taxdump.tar.gz -C taxdump
 
-# 3. Build the MMseqs2 database (run inside the contigs conda env, or with mmseqs2 on PATH)
+# 2. Build the MMseqs2 database
 mmseqs createdb uniref50.fasta.gz /path/to/uniref50_mmseqs
 mmseqs createtaxdb /path/to/uniref50_mmseqs taxdump/tmp \
-    --ncbi-tax-dump taxdump \
-    --tax-mapping-file taxdump/nodes.dmp
+    --ncbi-tax-dump taxdump
 mmseqs createindex /path/to/uniref50_mmseqs taxdump/tmp --search-type 2
 ```
 
-```yaml
-uniref50_db: /path/to/uniref50_mmseqs
-```
-
----
+Set `uniref50_db: /path/to/uniref50_mmseqs` in `config/config.yaml`. This step requires ~75 GB disk and 4–8 hours to complete.
 
 #### GTDB-tk reference data *(optional)*
 
 ```bash
-# Uses the GTDB-tk built-in downloader (~66 GB)
 conda run -n gtdbtk download-db.sh /path/to/gtdbtk_db
 ```
 
-```yaml
-gtdbtk_db: /path/to/gtdbtk_db
-```
-
-To skip GTDB-tk entirely: `skip_gtdbtk: True`
-
----
+Set `gtdbtk_db: /path/to/gtdbtk_db`. To skip: `skip_gtdbtk: True`.
 
 #### METABOLIC *(optional)*
 
@@ -153,13 +100,7 @@ To skip GTDB-tk entirely: `skip_gtdbtk: True`
 git clone https://github.com/AnantharamanLab/METABOLIC.git /path/to/METABOLIC
 ```
 
-```yaml
-metabolic_dir: /path/to/METABOLIC
-```
-
-To skip: `skip_metabolic: True`
-
----
+Set `metabolic_dir: /path/to/METABOLIC`. To skip: `skip_metabolic: True`.
 
 #### CheckM2 *(optional)*
 
@@ -167,11 +108,7 @@ To skip: `skip_metabolic: True`
 checkm2 database --download --path /path/to/checkm2_db
 ```
 
-```yaml
-checkm2_db: /path/to/checkm2_db/CheckM2_database/uniref100.KO.1.dmnd
-```
-
-To skip: `skip_checkm2: True`
+Set `checkm2_db: /path/to/checkm2_db/CheckM2_database/uniref100.KO.1.dmnd`. To skip: `skip_checkm2: True`.
 
 ---
 
