@@ -15,20 +15,30 @@ _REPO = os.path.dirname(os.path.dirname(os.path.dirname(workflow.snakefile)))
 if _TEST:
     input_dir  = os.path.join(_REPO, "test", "data")
     output_dir = os.path.join(_REPO, "test", "output")
-    # Override all database paths to mini test versions
-    config["scg_db"]      = os.path.join(_REPO, "test", "dbs", "scg", "SCGs_40.fasta")
-    config["uniref50_db"]  = os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mmseqs")
-    config["markers_db"]   = os.path.join(_REPO, "test", "dbs", "markers")
-    # GTDB-tk and METABOLIC are skipped in test mode (see Snakefile rule all)
+    # GTDB-tk, METABOLIC, and CheckM2 are skipped in test mode
     config["skip_gtdbtk"]    = True
     config["skip_metabolic"] = True
     config["skip_checkm2"]   = True
     # Increase geNomad splits to reduce peak memory on low-RAM machines
     config.setdefault("genomad_splits", 4)
 else:
-    # Load config variables
     input_dir  = config.get("in_dir", "")
     output_dir = config.get("out_dir", "")
+
+# ---------------------------------------------------------------------------
+#   Database paths — all production databases live in SWAM-meta/dbs/
+#   (gitignored). Test mode uses mini FASTAs from test/dbs/ for inputs
+#   but writes built indices to the same dbs/ directory.
+# ---------------------------------------------------------------------------
+
+_DBS_DIR = os.path.join(_REPO, "dbs")
+_SCG_DB = (
+    os.path.join(_REPO, "test", "dbs", "scg", "SCGs_40.fasta") if _TEST
+    else os.path.join(_REPO, "workflow", "resources", "SCGs_40_All.fasta")
+)
+_UNIREF50_DB   = os.path.join(_DBS_DIR, "uniref50", "uniref50_mmseqs")
+_CHECKM2_DB    = os.path.join(_DBS_DIR, "checkm2", "CheckM2_database", "uniref100.KO.1.dmnd")
+_METABOLIC_DIR = os.path.join(_DBS_DIR, "METABOLIC")
 
 # ---------------------------------------------------------------------------
 #   Resource helper: returns test value when running in test mode

@@ -3,7 +3,7 @@
 # -------------------------------------------------------------------
 
 in_dir:  ""    # Directory containing paired-end FASTQ files
-out_dir: ""    # Output root directory
+out_dir: ""    # Output root directory (per-dataset analysis outputs)
 
 # -------------------------------------------------------------------
 #  Stage control — set any stage to False to skip it
@@ -39,32 +39,15 @@ contigs_dir: ""
 #  Reference databases
 # -------------------------------------------------------------------
 
-scg_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/SCGs_40_All.fasta"
-
-# Path to the pre-built MMseqs2 UniRef50 taxonomy database prefix.
-# Build with:
-#   mmseqs createdb uniref50.fasta PREFIX
-#   mmseqs createtaxdb PREFIX tmp --ncbi-tax-dump TAXDIR
-#   mmseqs createindex PREFIX tmp --search-type 2
-uniref50_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/uniref50_mmseqs/uniref50_mmseqs"
-
-# Path to the GTDB-tk reference data directory.
-# Download with: download-db.sh /path/to/gtdbtk_db
-gtdbtk_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/gtdbtk_db"
-
-# Path to the METABOLIC installation directory (cloned from GitHub).
-metabolic_dir: "/work/NRSAAMR/Projects/SWAM/meta/METABOLIC"
-
-# Path to the CheckM2 diamond database file.
-# Download with: checkm2 database --download --path /path/to/checkm2_db
-checkm2_db: "/work/NRSAAMR/Projects/SWAM/meta/dbs/checkm2_db/CheckM2_database/uniref100.KO.1.dmnd"
+# Path to the GTDB-tk reference data directory (the only database that
+# requires manual setup — all others are auto-downloaded by initiate_dbs).
+# Download with:  conda run -n gtdbtk download-db.sh /path/to/gtdbtk_db
+gtdbtk_db: ""
 
 # Number of geNomad database splits (increase to reduce memory usage).
 genomad_splits: 1
 
-# Set to True to skip GTDB-tk or METABOLIC (requires large reference databases).
+# Set to True to skip optional stages that require large reference databases.
 skip_gtdbtk: False
 skip_metabolic: False
-
-# Set to True to skip CheckM2 MAG quality assessment (requires checkm2_db).
 skip_checkm2: False

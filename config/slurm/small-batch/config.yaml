@@ -36,6 +36,7 @@ default-resources:
 # -----------------------------------------------------------
 
 set-threads:
+  init_mmseqs_db: 16
   short_reads: 16
   contigs: 32
   genomad: 32
@@ -60,6 +61,11 @@ set-threads:
 # -----------------------------------------------------------
 
 set-resources:
+  # --- One-time database setup ---
+  init_mmseqs_db:
+    mem_mb: 32000
+    runtime: 4320
+
   # --- Short reads ---
   short_reads:
     mem_mb: 20000

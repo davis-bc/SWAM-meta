@@ -3,15 +3,49 @@
 # MAG (Metagenome-Assembled Genome) binning and characterisation.
 #
 # Rules in dependency order:
+#   init_checkm2_db – one-time CheckM2 database download
 #   bin            – MetaBAT2 binning from contig BAM
 #   mag_prodigal   – Prodigal gene prediction per bin
 #   mag_amr        – AMRFinderPlus on each bin's predicted proteins
 #   mag_mge        – MobileElementFinder on each bin's contigs
 #   mag_taxonomy   – GTDB-tk classify_wf (skipped when config skip_gtdbtk=True)
 #   mag_metabolism – METABOLIC (skipped when config skip_metabolic=True)
+#   mag_qc         – CheckM2 quality assessment (skipped when config skip_checkm2=True)
 #   mag_abundance  – CoverM trimmed_mean per bin
 
 import os
+
+# ---------------------------------------------------------------------------
+#   One-time: download CheckM2 reference database into _DBS_DIR
+# ---------------------------------------------------------------------------
+
+rule init_checkm2_db:
+    output:
+        done = os.path.join(_DBS_DIR, ".checkm2.done")
+    params:
+        db_dir    = os.path.join(_DBS_DIR, "checkm2"),
+        db_path   = _CHECKM2_DB,
+        skip      = config.get("skip_checkm2", False),
+        test_mode = _TEST
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "init_checkm2_db.log")
+    conda: "../envs/checkm2.yaml"
+    shell:
+        """
+        mkdir -p {params.db_dir}
+        if [ "{params.skip}" = "True" ]; then
+            echo "CheckM2: database setup skipped (skip_checkm2=True)"
+        elif [ "{params.test_mode}" = "True" ]; then
+            echo "CheckM2: test mode — skipping database download"
+        elif [ -f "{params.db_path}" ]; then
+            echo "CheckM2: database already exists, skipping download"
+        else
+            echo "CheckM2: downloading database (~3 GB)..."
+            checkm2 database --download --path {params.db_dir} >> {log} 2>&1
+            echo "CheckM2: database ready"
+        fi
+        touch {output.done}
+        """
 
 # ---------------------------------------------------------------------------
 #   Binning with MetaBAT2
@@ -267,14 +301,15 @@ rule mag_taxonomy:
 
 rule mag_metabolism:
     input:
-        done = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done")
+        done          = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"),
+        metabolic_done = os.path.join(_DBS_DIR, ".metabolic.done.txt")
     output:
         done = os.path.join(output_dir, "data", "bins", "{sample}", ".metabolic.done")
     params:
-        bin_dir      = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
-        out_dir      = os.path.join(output_dir, "data", "bins", "{sample}", "metabolic"),
-        metabolic_dir = config.get("metabolic_dir", ""),
-        skip         = config.get("skip_metabolic", False)
+        bin_dir       = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
+        out_dir       = os.path.join(output_dir, "data", "bins", "{sample}", "metabolic"),
+        metabolic_dir = _METABOLIC_DIR,
+        skip          = config.get("skip_metabolic", False)
     threads: lambda wc: res(64, 4)
     resources:
         mem_mb  = lambda wc: res(150000, 8000),
@@ -305,13 +340,14 @@ rule mag_metabolism:
 
 rule mag_qc:
     input:
-        done = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done")
+        done         = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"),
+        checkm2_done = os.path.join(_DBS_DIR, ".checkm2.done")
     output:
         tsv  = os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv")
     params:
         bin_dir = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
         out_dir = os.path.join(output_dir, "data", "bins", "{sample}", "checkm2"),
-        db_path = config.get("checkm2_db", ""),
+        db_path = _CHECKM2_DB,
         skip    = config.get("skip_checkm2", False)
     threads: lambda wc: res(16, 4)
     resources:

@@ -58,90 +58,58 @@ Expected runtime: ~30–60 minutes on a laptop. Outputs are written to `test/out
 
 ## Production setup
 
-### 1. Prepare required databases
+### 1. Add the SCG reference database
 
-#### AMRFinderPlus + human genome
-Downloaded automatically on first run by the `initiate_dbs` rule (~1.2 GB total). No manual action needed.
-
-#### 40 single-copy gene database (`scg_db`)
-Provide the path to `SCGs_40_All.fasta` in `config/config.yaml` under `scg_db`. Obtain from the lab shared data directory or the [SWAM-g companion data repository](https://github.com/bhattlab/SWAM-g).
-
-#### Anthropogenic markers (`markers_db`)
-Provide the path to a directory containing `pBI143.fasta` and `crAss001.fasta` under `markers_db`.
-
-#### UniRef50 MMseqs2 taxonomy database (`uniref50_db`)
+SWAM-meta ships with all database setup automated **except** the 40 single-copy gene (SCG) FASTA, which must be placed in `workflow/resources/` before first use:
 
 ```bash
-# 1. Download UniRef50 FASTA and NCBI taxonomy dump
-wget https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz
-wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
-mkdir taxdump && tar -xzf taxdump.tar.gz -C taxdump
-
-# 2. Build the MMseqs2 database
-mmseqs createdb uniref50.fasta.gz /path/to/uniref50_mmseqs
-mmseqs createtaxdb /path/to/uniref50_mmseqs taxdump/tmp \
-    --ncbi-tax-dump taxdump
-mmseqs createindex /path/to/uniref50_mmseqs taxdump/tmp --search-type 2
+cp /path/to/SCGs_40_All.fasta workflow/resources/SCGs_40_All.fasta
 ```
 
-Set `uniref50_db: /path/to/uniref50_mmseqs` in `config/config.yaml`. This step requires ~75 GB disk and 4–8 hours to complete.
-
-#### GTDB-tk reference data *(optional)*
-
-```bash
-conda run -n gtdbtk download-db.sh /path/to/gtdbtk_db
-```
-
-Set `gtdbtk_db: /path/to/gtdbtk_db`. To skip: `skip_gtdbtk: True`.
-
-#### METABOLIC *(optional)*
-
-```bash
-git clone https://github.com/AnantharamanLab/METABOLIC.git /path/to/METABOLIC
-```
-
-Set `metabolic_dir: /path/to/METABOLIC`. To skip: `skip_metabolic: True`.
-
-#### CheckM2 *(optional)*
-
-```bash
-checkm2 database --download --path /path/to/checkm2_db
-```
-
-Set `checkm2_db: /path/to/checkm2_db/CheckM2_database/uniref100.KO.1.dmnd`. To skip: `skip_checkm2: True`.
-
----
+> The SCG FASTA is a curated set used to estimate genome equivalents (cpg normalisation). See `workflow/resources/README.md` for details.
 
 ### 2. Configure `config/config.yaml`
 
+Only three paths are required. Open `config/config.yaml` and set:
+
 ```yaml
-# Required
-in_dir:      /path/to/fastq_files        # paired-end FASTQs (*R1*.fastq* or *_1.fastq*)
-out_dir:     /path/to/output
-scg_db:      /path/to/SCGs_40_All.fasta
-markers_db:  /path/to/markers_directory  # must contain pBI143.fasta + crAss001.fasta
-uniref50_db: /path/to/uniref50_mmseqs    # MMseqs2 DB prefix
-
-# Optional large databases
-gtdbtk_db:    /path/to/gtdbtk_db
-metabolic_dir: /path/to/METABOLIC
-checkm2_db:   /path/to/CheckM2_database/uniref100.KO.1.dmnd
-
-# Performance tuning
-genomad_splits: 1     # increase (e.g. 4–8) to reduce geNomad peak memory
-
-# Skip optional stages
-skip_gtdbtk:   False
-skip_metabolic: False
-skip_checkm2:  False
-
-# Stage control (see "Modular execution" below)
-run_short_reads: True
-run_contigs:     True
-run_mags:        True
+in_dir:   /path/to/fastq_files   # paired-end FASTQs (*R1*.fastq* or *_1.fastq*)
+out_dir:  /path/to/output        # per-dataset analysis output directory
+gtdbtk_db: ""                    # optional: path to GTDB-tk reference data
 ```
 
----
+All other databases (AMRFinderPlus, human reference genome, anthropogenic markers, UniRef50 MMseqs2, CheckM2, METABOLIC) are **downloaded and built automatically** by SWAM-meta into `SWAM-meta/dbs/` on first run. This directory is gitignored and shared across all datasets.
+
+**Optional databases** — downloaded only when the corresponding stage is enabled:
+
+| Database | Triggered by | Size | Notes |
+|----------|-------------|------|-------|
+| AMRFinderPlus + human genome | first run | ~1.2 GB | always downloaded |
+| Anthropogenic markers (pBI143, crAss001) | first run | < 1 MB | auto-fetched from NCBI |
+| UniRef50 MMseqs2 taxonomy DB | first `init_mmseqs_db` | ~75 GB | 4–8 h build time |
+| CheckM2 reference DB | first run with `skip_checkm2: False` | ~3 GB | auto-downloaded |
+| METABOLIC | first run with `skip_metabolic: False` | ~500 MB | git-cloned |
+
+**GTDB-tk** is the only database that must be set up manually (it has no automated installer):
+
+```bash
+conda run -n gtdbtk download-db.sh /path/to/gtdbtk_db
+# then set  gtdbtk_db: /path/to/gtdbtk_db  in config/config.yaml
+```
+
+To skip optional stages entirely, set in `config/config.yaml`:
+
+```yaml
+skip_gtdbtk:   True
+skip_metabolic: True
+skip_checkm2:  True
+```
+
+Optional tuning:
+
+```yaml
+genomad_splits: 1     # increase (e.g. 4–8) to reduce geNomad peak memory
+```
 
 ### 3. Run the workflow
 
@@ -285,9 +253,11 @@ The same `n_genomes` estimate from the SCG DIAMOND alignment is shared between s
 
 ```
 config/
-  config.yaml                   # user configuration (edit before production run)
+  config.yaml                   # user configuration (in_dir, out_dir, gtdbtk_db only)
 workflow/
   Snakefile                     # entry point; defines rule all
+  resources/
+    SCGs_40_All.fasta           # 40 curated single-copy genes (must be added manually)
   rules/
     common.smk                  # sample discovery, test-mode overrides, resource helper
     short_reads.smk             # QC, host filtering, AMR + SCG + marker alignment
@@ -301,6 +271,7 @@ workflow/
     contig_summary.py           # joins geNomad, MMseqs2, AMR, MGE, abundance per sample
     amr_unified.py              # merges short-read + contig AMR; generates AMR_unified.csv + AMR_abundance_summary.csv
     detect_circular_contigs.py  # Yu et al. 2024 circularity algorithm (used by MobMess rule)
+dbs/                            # auto-managed databases (gitignored; shared across datasets)
 test/
   data/                         # mock FASTQ pairs (mock1, mock2) — biologically realistic
   dbs/                          # mini test databases (AMRFinderPlus subset, UniRef50 subset, etc.)

@@ -4,16 +4,19 @@
 
 rule init_genomad:
     output:
-        genomad_db   = os.path.join(output_dir, "data", "genomad", ".genomad.db.done.txt") 
+        genomad_db   = os.path.join(_DBS_DIR, ".genomad.db.done.txt")
+    params:
+        dbs_dir = _DBS_DIR
     log:
         os.path.join(output_dir, "data", "QAQC", "logs", "init_genomad.log")
     conda: "../envs/genomad.yaml"
     shell:
         """
-        if [ ! -d $(dirname {output.genomad_db})/genomad_db ]; then
+        mkdir -p {params.dbs_dir}
+        if [ ! -d {params.dbs_dir}/genomad_db ]; then
         
         echo "geNomad: downloading database..."
-        cd $(dirname {output.genomad_db})
+        cd {params.dbs_dir}
         curl -L https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz 2>> {log} | tar -xz 2>> {log}
         touch {output.genomad_db}
         echo "geNomad: database ready"
@@ -81,7 +84,7 @@ rule contigs:
 rule genomad:
     input:
         contigs      = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        genomad_db   = os.path.join(output_dir, "data", "genomad", ".genomad.db.done.txt")
+        genomad_db   = os.path.join(_DBS_DIR, ".genomad.db.done.txt")
     output:
         genomad      = directory(os.path.join(output_dir, "data", "genomad", "{sample}")),
         plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid.fna"),
@@ -160,23 +163,24 @@ rule mobmess:
 
 rule init_mmseqs_db:
     output:
-        done = os.path.join(output_dir, "data", "mmseqs", ".mmseqs_db.done")
+        done = os.path.join(_DBS_DIR, ".mmseqs_db.done")
     params:
         test_mode    = _TEST,
-        db_prefix    = lambda wc: os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mmseqs")
-                       if _TEST else config.get("uniref50_db", ""),
+        db_prefix    = _UNIREF50_DB,
+        dbs_dir      = _DBS_DIR,
         test_fasta   = os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mini.fasta"),
         test_tax_dir = os.path.join(_REPO, "test", "dbs", "uniref50"),
         test_mapping = os.path.join(_REPO, "test", "dbs", "uniref50", "tax_mapping.tsv"),
-    conda: "../envs/contigs.yaml"
+    threads: lambda wc: res(16, 4)
     resources:
-        mem_mb  = lambda wc: res(8000, 4000),
-        threads = 1,
+        mem_mb  = lambda wc: res(32000, 4000),
+        threads = lambda wc: res(16, 4),
+    conda: "../envs/contigs.yaml"
     log:
         os.path.join(output_dir, "data", "QAQC", "logs", "init_mmseqs_db.log")
     shell:
         """
-        mkdir -p $(dirname {output.done})
+        mkdir -p "$(dirname {params.db_prefix})"
 
         if [ "{params.test_mode}" = "True" ]; then
             echo "MMseqs2: building test taxonomy database..."
@@ -191,9 +195,36 @@ rule init_mmseqs_db:
             echo "MMseqs2: test database ready"
         else
             if [ ! -f "{params.db_prefix}.dbtype" ]; then
-                echo "ERROR: UniRef50 MMseqs2 database not found at {params.db_prefix}"
-                echo "Build it with: mmseqs createdb uniref50.fasta PREFIX && mmseqs createtaxdb PREFIX tmp --ncbi-tax-dump TAXDIR"
-                exit 1
+                UNIREF_FASTA="{params.dbs_dir}/uniref50/uniref50.fasta"
+                TAX_DIR="{params.dbs_dir}/uniref50/taxdump"
+                TMP_DIR="{params.dbs_dir}/uniref50/tmp"
+                mkdir -p "$TAX_DIR" "$TMP_DIR"
+
+                echo "MMseqs2: downloading UniRef50 FASTA (~9 GB)..."
+                wget -q -O "$UNIREF_FASTA.gz" \
+                    https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz >> {log} 2>&1
+                echo "MMseqs2: decompressing UniRef50..."
+                gunzip -f "$UNIREF_FASTA.gz" >> {log} 2>&1
+
+                echo "MMseqs2: downloading NCBI taxonomy..."
+                wget -q -P "$TAX_DIR" \
+                    https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz >> {log} 2>&1
+                tar -xzf "$TAX_DIR/taxdump.tar.gz" -C "$TAX_DIR" >> {log} 2>&1
+
+                echo "MMseqs2: building taxonomy database (this may take several hours)..."
+                mmseqs createdb "$UNIREF_FASTA" {params.db_prefix} >> {log} 2>&1
+                mmseqs createtaxdb {params.db_prefix} "$TMP_DIR" \
+                    --ncbi-tax-dump "$TAX_DIR" \
+                    --threads {resources.threads} >> {log} 2>&1
+                mmseqs createindex {params.db_prefix} "$TMP_DIR" \
+                    --search-type 2 \
+                    --threads {resources.threads} >> {log} 2>&1
+
+                rm -f "$UNIREF_FASTA"
+                rm -rf "$TMP_DIR" "$TAX_DIR"
+                echo "MMseqs2: production database ready"
+            else
+                echo "MMseqs2: database already exists at {params.db_prefix}, skipping"
             fi
         fi
         touch {output.done}
@@ -319,12 +350,11 @@ rule mge_annotation:
 rule mmseqs_taxonomy:
     input:
         contigs  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        db_done  = os.path.join(output_dir, "data", "mmseqs", ".mmseqs_db.done")
+        db_done  = os.path.join(_DBS_DIR, ".mmseqs_db.done")
     output:
         lca = os.path.join(output_dir, "data", "mmseqs", "{sample}_lca.tsv")
     params:
-        db_prefix = lambda wc: os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mmseqs")
-                    if _TEST else config.get("uniref50_db", ""),
+        db_prefix = _UNIREF50_DB,
         tmp       = lambda wc: os.path.join(output_dir, "data", "mmseqs", f"{wc.sample}_tmp")
     threads: lambda wc: res(32, 4)
     resources:
