@@ -460,3 +460,24 @@ Dry-run job counts for all mode combinations (all validated this session):
 - `SCGs_40_All.fasta` must still be copied manually to `workflow/resources/` — git LFS could track it if needed.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders still need filling before cluster use.
+
+---
+
+## 2026-03-22 (session 17)
+
+### What was done
+
+**Bug fix — contig taxonomy showing rank label instead of taxname:**
+
+- `workflow/scripts/contig_summary.py` → `parse_lca()`: changed `df.iloc[:, 2]` to `df.iloc[:, 3]`.
+- Root cause: MMseqs2 `easy-taxonomy` `_lca.tsv` has 9 columns — `query, taxid, rank, taxname, n_frags, n_direct, n_classified, fraction, lineage`. The old code read column 2 (rank — e.g. `"species"`, `"no rank"`) instead of column 3 (actual taxname — e.g. `"Escherichia coli"`).
+- Also tightened the column-count guard from `< 3` to `< 4` and corrected the docstring comment.
+- Commit: `aa1e2d3`
+
+### Current pipeline state
+- Dry run passes (exit 0).
+- Taxonomy values in `contig_summary.tsv` will now correctly show species/taxon names.
+
+### Known issues / next steps
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
