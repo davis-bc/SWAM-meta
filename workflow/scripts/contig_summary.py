@@ -53,11 +53,11 @@ def parse_genomad_molecule_type(plas_sum_path, vir_sum_path):
 def parse_lca(lca_path):
     """Return dict {contig_id -> taxonomy_string} from MMseqs2 easy-taxonomy LCA TSV."""
     df = safe_read(lca_path, header=None)
-    if df.empty or len(df.columns) < 3:
+    if df.empty or len(df.columns) < 4:
         return {}
-    # columns: query, taxid, taxname[, lineage]
+    # columns: query, taxid, rank, taxname, n_frags, n_direct, n_classified, fraction, lineage
     df.columns = list(df.columns)  # keep int index
-    return dict(zip(df.iloc[:, 0].astype(str), df.iloc[:, 2].astype(str)))
+    return dict(zip(df.iloc[:, 0].astype(str), df.iloc[:, 3].astype(str)))
 
 
 def parse_abundance(abund_path):
