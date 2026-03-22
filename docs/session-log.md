@@ -530,3 +530,31 @@ Dry-run job counts for all mode combinations (all validated this session):
 - Run full test pipeline to confirm blaTEM-1 appears in `contig_summary.tsv`.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2026-03-22 (session 20)
+
+### What was done
+
+**Full end-to-end test run** — confirmed pipeline completes 34/34 jobs in test mode.
+
+**Bug identified: AMRFinderPlus protein-mode DB not initialized**
+
+- `contig_amr` and `mag_amr` rules call `amrfinder -n/-p/-g` without specifying `--database`.
+- AMRFinderPlus looks for its DB at `share/amrfinderplus/data/latest` inside the conda env, which does not exist (it requires `amrfinder -u` to download).
+- The `|| true` fallback silently produces empty TSVs — pipeline completes but all contig-level and MAG-level AMR annotations are empty.
+- This explains why blaTEM-1 is `short_reads_only` with `contig_cpg=0.0` — it was never annotated at the contig level, not because it failed to assemble.
+- The KMA-indexed mini DB at `dbs/afp_db` covers short-read alignment only; `amrfinder` protein/nucleotide mode needs its own proprietary DB format.
+
+### Current pipeline state
+- 34/34 jobs complete ✅
+- blaTEM-1 detected at short-reads level (cpg ~27) in both mock samples ✅
+- `contig_summary.tsv` (819 rows), `AMR_unified.csv`, `AMR_abundance_summary.csv`, `fastp_summary.csv`, `mag_summary.tsv` all produced ✅
+- 3 bins per sample at correct abundance (~10 cpg) ✅
+- Contig-level and MAG-level AMRFinderPlus annotation: ❌ silently failing (empty output, gracefully handled)
+
+### Known issues / next steps
+- **Fix AMRFinderPlus DB init**: Add `amrfinder -u --database {_DBS_DIR}/amrfinderplus_db` to `initiate_dbs` (production branch); add `--database` flag to `contig_amr` and `mag_amr` rule shell blocks.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
