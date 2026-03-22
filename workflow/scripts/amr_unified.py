@@ -13,7 +13,9 @@ Join key: gene_symbol
   = 'allele' column in short_reads_output.csv
   = 'gene'   column in contig_summary.tsv (feature_type == "AMR")
 
-Abundance priority: contig cpg preferred when available; else short-reads cpg.
+Abundance priority: short-reads cpg preferred (most sensitive; captures all reads
+including those that don't assemble). Contig cpg used only as fallback when there
+is no short-read hit (gene is contigs_only — indicates a novel assembled allele).
 
 Metadata priority:
   1. contig_amr.tsv  (direct AMRFinderPlus output on contigs — most accurate)
@@ -195,7 +197,7 @@ unified["evidence"] = "short_reads_only"
 unified.loc[has_ct & ~has_sr, "evidence"] = "contigs_only"
 unified.loc[has_sr &  has_ct, "evidence"] = "both"
 
-unified["cpg"] = unified["contig_cpg"].where(has_ct, unified["short_reads_cpg"])
+unified["cpg"] = unified["short_reads_cpg"].where(has_sr, unified["contig_cpg"])
 
 unified["short_reads_cpg"] = unified["short_reads_cpg"].fillna(0.0)
 unified["contig_cpg"]      = unified["contig_cpg"].fillna(0.0)
@@ -235,7 +237,7 @@ amr_total = (
 
 summary = amr_total.merge(markers, on="sample", how="left") if not markers.empty else amr_total
 # fill missing marker columns
-for mc in ["pBI143 (cpg)", "crAss001 (cpg)"]:
+for mc in ["pBI143_cpg", "crAss001_cpg"]:
     if mc not in summary.columns:
         summary[mc] = 0.0
     else:

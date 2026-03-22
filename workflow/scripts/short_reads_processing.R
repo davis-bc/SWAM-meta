@@ -215,18 +215,18 @@ if (!is.null(markers) && nrow(markers) > 0) {
 
 pbi143_cpg <- marker_cpg %>%
   filter(seq_id == "U30316.1") %>%
-  select(sample, `pBI143 (cpg)` = cpg)
+  select(sample, pBI143_cpg = cpg)
 
 crass_cpg <- marker_cpg %>%
   filter(seq_id == "NC_049977.1") %>%
-  select(sample, `crAss001 (cpg)` = cpg)
+  select(sample, crAss001_cpg = cpg)
 
 markers_out <- tibble(sample = unique(fastp_summary$sample)) %>%
   left_join(pbi143_cpg, by = "sample") %>%
   left_join(crass_cpg, by = "sample") %>%
   mutate(
-    `pBI143 (cpg)`  = replace_na(`pBI143 (cpg)`, 0),
-    `crAss001 (cpg)` = replace_na(`crAss001 (cpg)`, 0)
+    pBI143_cpg  = replace_na(pBI143_cpg, 0),
+    crAss001_cpg = replace_na(crAss001_cpg, 0)
   )
 
 write.csv(markers_out, out_file3, row.names = FALSE)

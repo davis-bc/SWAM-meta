@@ -74,12 +74,16 @@ COVERAGE = {
     "campylobacter": 10,
     "carjivirus":     3,
     "influenza":      3,
+    # Small synthetic plasmid carrying blaTEM-1 at high coverage to ensure
+    # reliable MEGAHIT assembly and contig-level AMRFinderPlus annotation.
+    # At ~3 kb total and 100x, this adds only ~1,000 read pairs per sample.
+    "arg_spike":    100,
 }
 
 # Sample compositions
 SAMPLES = {
-    "mock1": ["ecoli", "efaecalis", "carjivirus", "influenza"],
-    "mock2": ["ecoli", "salmonella", "campylobacter", "carjivirus"],
+    "mock1": ["ecoli", "efaecalis", "carjivirus", "influenza", "arg_spike"],
+    "mock2": ["ecoli", "salmonella", "campylobacter", "carjivirus", "arg_spike"],
 }
 
 # Per-sample base wgsim seeds (offset applied per genome within sample)
@@ -263,6 +267,32 @@ def save_reference_fastas(ref_dir, ecoli_records):
 # Read simulation
 # ---------------------------------------------------------------------------
 
+# Synthetic flanking sequence flanking blaTEM-1 in the ARG spike plasmid.
+# Provides assembly context without relying on any external reference.
+# 1000 bp each side (repeating ATCG pattern with variation to avoid tandem-
+# repeat collapse in assembly).
+_FLANK_SEED = 42
+_FLANK_LEN  = 1000
+
+def _make_flank(length: int, seed: int) -> str:
+    rng = __import__("random").Random(seed)
+    bases = "ATCG"
+    return "".join(rng.choice(bases) for _ in range(length))
+
+ARG_SPIKE_LEFT  = _make_flank(_FLANK_LEN, _FLANK_SEED)
+ARG_SPIKE_RIGHT = _make_flank(_FLANK_LEN, _FLANK_SEED + 1)
+ARG_SPIKE_SEQ   = ARG_SPIKE_LEFT + BLA_TEM1 + ARG_SPIKE_RIGHT
+
+
+def make_arg_spike_fasta(path: str) -> int:
+    """Write the ARG spike plasmid FASTA and return its length."""
+    with open(path, "w") as fh:
+        fh.write(">arg_spike_blaTEM1\n")
+        for i in range(0, len(ARG_SPIKE_SEQ), 70):
+            fh.write(ARG_SPIKE_SEQ[i:i + 70] + "\n")
+    return len(ARG_SPIKE_SEQ)
+
+
 def simulate_wgsim(wgsim, fa_path, n_pairs, seed, r1_out, r2_out):
     cmd = (
         f"{wgsim} -N {n_pairs} -1 {READ_LEN} -2 {READ_LEN} "
@@ -288,6 +318,12 @@ def make_sample(wgsim, sample, components, base_seed, ref_dir, ecoli_records, tm
             if not os.path.exists(fa_path):
                 write_fasta(fa_path, ecoli_records)
             genome_len = sum(len(s) for _, s in ecoli_records)
+        elif name == "arg_spike":
+            fa_path = os.path.join(tmpdir, "arg_spike.fa")
+            if not os.path.exists(fa_path):
+                genome_len = make_arg_spike_fasta(fa_path)
+            else:
+                genome_len = len(ARG_SPIKE_SEQ)
         else:
             gz_path = os.path.join(ref_dir, GENOME_FILES[name])
             fa_path  = os.path.join(tmpdir, f"{name}.fa")

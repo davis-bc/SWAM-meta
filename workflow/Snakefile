@@ -26,7 +26,7 @@ include: "rules/contigs.smk"
 include: "rules/mags.smk"
 include: "rules/summary.smk"
 
-localrules: initiate_dbs, short_reads_summary, init_genomad, init_checkm2_db, init_mge_tool, contig_summary, amr_unified
+localrules: initiate_dbs, short_reads_summary, init_genomad, init_checkm2_db, init_mge_tool, contig_summary, amr_unified, mag_summary
 
 # ------------------------------------------
 #   Define the target outputs for pipeline
@@ -39,8 +39,8 @@ def all_targets(wildcards):
     if _RUN_SR:
         targets += [
             os.path.join(output_dir, "fastp_summary.csv"),
-            os.path.join(output_dir, "short_reads_output.csv"),
-            os.path.join(output_dir, "markers_cpg.csv"),
+            os.path.join(output_dir, "data", "QAQC", "short_reads_output.csv"),
+            os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv"),
         ]
 
     # --- Contig assembly + annotation stage ---
@@ -82,6 +82,7 @@ def all_targets(wildcards):
                 os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv"),
                 sample=samples
             )
+        targets += [os.path.join(output_dir, "mag_summary.tsv")]
 
     return targets
 

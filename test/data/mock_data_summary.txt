@@ -43,14 +43,16 @@ Sample compositions and read simulation
     efaecalis       10x  →  110,450 read pairs
     carjivirus      3x  →  970 read pairs
     influenza       3x  →  200 read pairs
-    TOTAL           284,141 read pairs
+    arg_spike      100x  →  954 read pairs   (synthetic 2,861 bp plasmid; blaTEM-1 + flanking)
+    TOTAL           285,095 read pairs
 
   mock2:
     ecoli           10x  →  172,521 read pairs
     salmonella      10x  →  156,843 read pairs
     campylobacter   10x  →  64,637 read pairs
     carjivirus      3x  →  970 read pairs
-    TOTAL           394,971 read pairs
+    arg_spike      100x  →  954 read pairs   (synthetic 2,861 bp plasmid; blaTEM-1 + flanking)
+    TOTAL           395,925 read pairs
 
 Overlap between samples
 -----------------------
@@ -63,7 +65,8 @@ Expected workflow outcomes
   MetaBAT2 bins:  >= 1 MAG per sample (10x coverage of multi-Mb genomes)
   CheckM2:        Completeness + contamination estimates per MAG
   GTDB-tk:        Taxonomy for bacterial MAGs (requires large DB; skipped in test mode)
-  KMA/AMRFinder:  blaTEM-1 detected in short reads and contig AMR (embedded in E. coli first contig)
+  KMA/AMRFinder:  blaTEM-1 detected in short reads; also assembled from the arg_spike
+                  component (2,861 bp synthetic plasmid at 100x) → contig AMR annotation
   DIAMOND SCGs:   40 synthetic CDSes embedded in E. coli first contig -> n_genomes > 0
 
 SCG / AMR database embedding
