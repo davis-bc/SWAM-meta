@@ -509,3 +509,24 @@ Dry-run job counts for all mode combinations (all validated this session):
 - Run full test pipeline to confirm blaTEM-1 appears in `contig_summary.tsv`.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2026-03-23 (session 19)
+
+### What was done
+
+**Session restoration only — no code changes.**
+
+- Confirmed session 18 push (`324e0a3`) completed successfully to `origin/main`.
+- Appended session 18 log entry to `docs/session-log.md` (had not been written before the previous session ended) and committed as `7f6f8e9`.
+
+### Current pipeline state
+- HEAD: `7f6f8e9` — pushed to `origin/main`.
+- All 5 post-test fixes from session 18 are live.
+- Full test run has not yet been executed to confirm blaTEM-1 ARG spike assembly.
+
+### Known issues / next steps
+- Run full test pipeline to confirm blaTEM-1 appears in `contig_summary.tsv`.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
