@@ -481,3 +481,31 @@ Dry-run job counts for all mode combinations (all validated this session):
 ### Known issues / next steps
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2026-03-23 (session 18)
+
+### What was done
+
+**Five post-test-run fixes — all implemented and committed as `324e0a3`:**
+
+1. **ARG spike reads (issue i)** — blaTEM-1 was not assembling from the mock data because E. coli genome-wide coverage (10x) was too low. Added a synthetic 2,861 bp "ARG spike" FASTA (blaTEM-1 flanked by random sequence) simulated at 100x. Appended 954 read pairs per sample to existing test FASTQs via wgsim. Updated `test/scripts/generate_mock_data.py` so future regenerations include the spike natively. Updated `test/data/mock_data_summary.txt`.
+
+2. **Marker column names (issue ii)** — `short_reads_processing.R` was outputting `"pBI143 (cpg)"` and `"crAss001 (cpg)"` (spaces + parens). Renamed to `pBI143_cpg` and `crAss001_cpg` throughout. Updated `amr_unified.py` to match.
+
+3. **AMR cpg priority reversal (issue iii)** — Old logic preferred contig cpg over short-reads cpg. Reversed to always report short-reads cpg (most sensitive; captures all reads including those that don't assemble). Contig cpg used only for `contigs_only` rows (unique assembled alleles). Evidence column (`both`/`short_reads_only`/`contigs_only`) already serves as the "unique allele" flag.
+
+4. **MAG summary output (issue iv)** — New `workflow/scripts/mag_summary.py` aggregates per-sample MAG files into a single `mag_summary.tsv` at the output root. Columns: `sample`, `bin_id`, `abundance_trimmed_mean`, `n_amr_genes`, `amr_genes`, `n_mge`, `mge_elements`, plus optional `completeness`, `contamination`, `quality_score` (CheckM2) and `classification` (GTDB-Tk). New `mag_summary` localrule in `summary.smk`. Added to `all_targets()` in `Snakefile`.
+
+5. **Output consolidation (issue v)** — Moved intermediate files out of the output root: `short_reads_output.csv` → `data/QAQC/short_reads_output.csv`; `markers_cpg.csv` → `data/QAQC/markers_cpg.csv`. Top-level outputs now: `AMR_unified.csv`, `AMR_abundance_summary.csv`, `contig_summary.tsv`, `fastp_summary.csv`, `mag_summary.tsv`.
+
+### Current pipeline state
+- Dry run passes (exit 0) in test mode.
+- HEAD: `324e0a3` — pushed to `origin/main`.
+- blaTEM-1 contig-level AMR annotation has **not yet been confirmed** in a full test run with the new spike reads (ARG spike added, but full re-run not completed this session).
+
+### Known issues / next steps
+- Run full test pipeline to confirm blaTEM-1 appears in `contig_summary.tsv`.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
