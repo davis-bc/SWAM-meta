@@ -58,36 +58,27 @@ Expected runtime: ~30–60 minutes on a laptop. Outputs are written to `test/out
 
 ## Production setup
 
-### 1. Add the SCG reference database
+### 1. Configure `config/config.yaml`
 
-SWAM-meta ships with all database setup automated **except** the 40 single-copy gene (SCG) FASTA, which must be placed in `workflow/resources/` before first use:
-
-```bash
-cp /path/to/SCGs_40_All.fasta workflow/resources/SCGs_40_All.fasta
-```
-
-> The SCG FASTA is a curated set used to estimate genome equivalents (cpg normalisation). See `workflow/resources/README.md` for details.
-
-### 2. Configure `config/config.yaml`
-
-Only three paths are required. Open `config/config.yaml` and set:
+Only two paths are required. Open `config/config.yaml` and set:
 
 ```yaml
-in_dir:   /path/to/fastq_files   # paired-end FASTQs (*R1*.fastq* or *_1.fastq*)
-out_dir:  /path/to/output        # per-dataset analysis output directory
-gtdbtk_db: ""                    # optional: path to GTDB-tk reference data
+in_dir:  /path/to/fastq_files   # paired-end FASTQs (*R1*.fastq* or *_1.fastq*)
+out_dir: /path/to/output        # per-dataset analysis output directory
 ```
 
-All other databases (AMRFinderPlus, human reference genome, anthropogenic markers, UniRef50 MMseqs2, CheckM2, METABOLIC) are **downloaded and built automatically** by SWAM-meta into `SWAM-meta/dbs/` on first run. This directory is gitignored and shared across all datasets.
+All databases (AMRFinderPlus, human reference genome, anthropogenic markers, UniRef50 MMseqs2, CheckM2, METABOLIC) are **downloaded and built automatically** by SWAM-meta into `SWAM-meta/dbs/` on first run. This directory is gitignored and shared across all datasets. The 40 single-copy gene (SCG) FASTA used for cpg normalisation ships with the repository at `workflow/resources/SCGs_40_All.fasta` — no manual setup required.
 
 **Optional databases** — downloaded only when the corresponding stage is enabled:
 
 | Database | Triggered by | Size | Notes |
 |----------|-------------|------|-------|
-| AMRFinderPlus + human genome | first run | ~1.2 GB | always downloaded |
-| Anthropogenic markers (pBI143, crAss001) | first run | < 1 MB | auto-fetched from NCBI |
-| UniRef50 MMseqs2 taxonomy DB | first `init_mmseqs_db` | ~75 GB | 4–8 h build time |
-| CheckM2 reference DB | first run with `skip_checkm2: False` | ~3 GB | auto-downloaded |
+| AMRFinderPlus KMA index + human genome | first run | ~1.2 GB | always downloaded; stored in `dbs/short_reads/` |
+| Anthropogenic markers (pBI143, crAss001) | first run | < 1 MB | auto-fetched from NCBI; stored in `dbs/short_reads/` |
+| AMRFinderPlus protein DB | first run | ~600 MB | stored in `dbs/amrfinderplus_db/` |
+| geNomad DB | first run | ~3 GB | stored in `dbs/genomad_db/` |
+| UniRef50 MMseqs2 taxonomy DB | first `init_mmseqs_db` | ~75 GB | 4–8 h build time; stored in `dbs/uniref50/` |
+| CheckM2 reference DB | first run with `skip_checkm2: False` | ~3 GB | stored in `dbs/checkm2/` |
 | METABOLIC | first run with `skip_metabolic: False` | ~500 MB | git-cloned |
 
 **GTDB-tk** is the only database that must be set up manually (it has no automated installer):
@@ -111,7 +102,7 @@ Optional tuning:
 genomad_splits: 1     # increase (e.g. 4–8) to reduce geNomad peak memory
 ```
 
-### 3. Run the workflow
+### 2. Run the workflow
 
 ```bash
 # Dry run (validate DAG + config)
@@ -127,11 +118,11 @@ snakemake --use-conda --cores <N> --scheduler greedy --rerun-incomplete
 snakemake --use-conda --cores <N> --scheduler greedy --forcerun <rule_name>
 ```
 
-The first run downloads and indexes the AMRFinderPlus database (~300 MB) and human reference genome (~900 MB) automatically.
+The first run downloads and indexes the AMRFinderPlus KMA database (~300 MB), the AMRFinderPlus protein database (~600 MB), and the human reference genome (~900 MB) automatically into `dbs/short_reads/` and `dbs/amrfinderplus_db/`.
 
 ---
 
-### 4. Running on SLURM
+### 3. Running on SLURM
 
 SWAM-meta includes two SLURM profiles using [snakemake-executor-plugin-slurm](https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html):
 
@@ -161,7 +152,7 @@ Both profiles set `scheduler: greedy`, `use-conda: true`, and all per-rule threa
 
 ---
 
-### 5. Modular execution
+### 4. Modular execution
 
 Use the `run_short_reads`, `run_contigs`, and `run_mags` config flags to run only the stages you need:
 
@@ -257,7 +248,7 @@ config/
 workflow/
   Snakefile                     # entry point; defines rule all
   resources/
-    SCGs_40_All.fasta           # 40 curated single-copy genes (must be added manually)
+    SCGs_40_All.fasta           # 40 curated single-copy genes (ships with repo; no setup needed)
   rules/
     common.smk                  # sample discovery, test-mode overrides, resource helper
     short_reads.smk             # QC, host filtering, AMR + SCG + marker alignment
@@ -272,6 +263,11 @@ workflow/
     amr_unified.py              # merges short-read + contig AMR; generates AMR_unified.csv + AMR_abundance_summary.csv
     detect_circular_contigs.py  # Yu et al. 2024 circularity algorithm (used by MobMess rule)
 dbs/                            # auto-managed databases (gitignored; shared across datasets)
+                                #   short_reads/   — AMRFinderPlus KMA, SCG DIAMOND, human genome, markers
+                                #   genomad_db/    — geNomad classification database
+                                #   amrfinderplus_db/ — AMRFinderPlus protein database
+                                #   uniref50/      — MMseqs2 UniRef50 taxonomy database
+                                #   checkm2/       — CheckM2 reference database
 test/
   data/                         # mock FASTQ pairs (mock1, mock2) — biologically realistic
   dbs/                          # mini test databases (AMRFinderPlus subset, UniRef50 subset, etc.)
