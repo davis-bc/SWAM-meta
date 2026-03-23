@@ -37,6 +37,7 @@ _SCG_DB = (
     else os.path.join(_REPO, "workflow", "resources", "SCGs_40_All.fasta")
 )
 _UNIREF50_DB   = os.path.join(_DBS_DIR, "uniref50", "uniref50_mmseqs")
+_AFP_DB_DIR    = os.path.join(_DBS_DIR, "amrfinderplus_db")
 _CHECKM2_DB    = os.path.join(_DBS_DIR, "checkm2", "CheckM2_database", "uniref100.KO.1.dmnd")
 _METABOLIC_DIR = os.path.join(_DBS_DIR, "METABOLIC")
 

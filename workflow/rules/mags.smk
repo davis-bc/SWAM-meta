@@ -151,12 +151,14 @@ checkpoint mag_prodigal:
 
 rule mag_amr:
     input:
-        done = os.path.join(output_dir, "data", "bins", "{sample}", ".prodigal.done")
+        done        = os.path.join(output_dir, "data", "bins", "{sample}", ".prodigal.done"),
+        afp_db_done = os.path.join(_DBS_DIR, ".amrfinder_db.done")
     output:
         tsv  = os.path.join(output_dir, "data", "bins", "{sample}", "mag_amr.tsv")
     params:
-        bin_dir = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
-        prd_dir = os.path.join(output_dir, "data", "bins", "{sample}", "prodigal")
+        bin_dir    = os.path.join(output_dir, "data", "bins", "{sample}", "bins"),
+        prd_dir    = os.path.join(output_dir, "data", "bins", "{sample}", "prodigal"),
+        afp_db_dir = _AFP_DB_DIR
     threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
@@ -180,6 +182,7 @@ rule mag_amr:
                 -n "$fa" \
                 -p "$faa" \
                 -g "$gff" \
+                --database {params.afp_db_dir} \
                 --threads {resources.threads} \
                 --annotation_format prodigal \
                 -o "$TMP_AMR.bin" >> {log} 2>&1 || true

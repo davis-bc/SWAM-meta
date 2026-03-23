@@ -255,16 +255,48 @@ rule prodigal:
         """
 
 # ---------------------------------------------------------------------------
+#   One-time: download AMRFinderPlus database (skipped in test mode)
+# ---------------------------------------------------------------------------
+
+rule init_amrfinder_db:
+    """Download the AMRFinderPlus database to dbs/amrfinderplus_db/. Skipped in test mode."""
+    output:
+        done = os.path.join(_DBS_DIR, ".amrfinder_db.done")
+    params:
+        db_dir    = _AFP_DB_DIR,
+        test_mode = _TEST
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "init_amrfinder_db.log")
+    conda: "../envs/mags.yaml"
+    shell:
+        """
+        mkdir -p {params.db_dir}
+        if [ "{params.test_mode}" = "True" ]; then
+            echo "init_amrfinder_db: test mode — skipping database download"
+        elif [ -d "{params.db_dir}/latest" ]; then
+            echo "init_amrfinder_db: database already exists, skipping download"
+        else
+            echo "init_amrfinder_db: downloading AMRFinderPlus database (~600 MB)..."
+            amrfinder -u --database {params.db_dir} >> {log} 2>&1
+            echo "init_amrfinder_db: database ready"
+        fi
+        touch {output.done}
+        """
+
+# ---------------------------------------------------------------------------
 #   Per-sample: AMR annotation on contigs (protein + nucleotide + GFF mode)
 # ---------------------------------------------------------------------------
 
 rule contig_amr:
     input:
-        contigs = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        faa     = os.path.join(output_dir, "data", "prodigal", "{sample}.faa"),
-        gff     = os.path.join(output_dir, "data", "prodigal", "{sample}.gff")
+        contigs     = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
+        faa         = os.path.join(output_dir, "data", "prodigal", "{sample}.faa"),
+        gff         = os.path.join(output_dir, "data", "prodigal", "{sample}.gff"),
+        afp_db_done = os.path.join(_DBS_DIR, ".amrfinder_db.done")
     output:
         tsv = os.path.join(output_dir, "data", "amr_contigs", "{sample}_contig_amr.tsv")
+    params:
+        afp_db_dir = _AFP_DB_DIR
     threads: lambda wc: res(16, 4)
     resources:
         mem_mb  = lambda wc: res(16000, 4000),
@@ -280,10 +312,11 @@ rule contig_amr:
             -n {input.contigs} \
             -p {input.faa} \
             -g {input.gff} \
+            --database {params.afp_db_dir} \
             --threads {resources.threads} \
             -o {output.tsv} \
             --annotation_format prodigal >> {log} 2>&1 || true
-        # Create empty file if no hits found or amrfinder failed on mock data
+        # Create empty file if no hits found or database not yet set up
         [ -f {output.tsv} ] || touch {output.tsv}
         echo "[{wildcards.sample}] AMRFinderPlus: done"
         """
