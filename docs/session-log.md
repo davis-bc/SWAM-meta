@@ -558,3 +558,31 @@ Dry-run job counts for all mode combinations (all validated this session):
 - **Fix AMRFinderPlus DB init**: Add `amrfinder -u --database {_DBS_DIR}/amrfinderplus_db` to `initiate_dbs` (production branch); add `--database` flag to `contig_amr` and `mag_amr` rule shell blocks.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2026-03-23 (session 21)
+
+### What was done
+
+**Fix: AMRFinderPlus database initialization for contig and MAG AMR annotation**
+
+Root cause: `amrfinder` protein/nucleotide mode needs its own database (downloaded via `amrfinder -u`), separate from the KMA-indexed `afp_db` used for short-read alignment. Without it, `amrfinder` failed silently via `|| true` and produced empty TSV files for all contig-level and MAG-level AMR calls.
+
+Changes (commit `9d5fd18`):
+- `common.smk`: added `_AFP_DB_DIR = dbs/amrfinderplus_db/`
+- `contigs.smk`: new `init_amrfinder_db` localrule — runs `amrfinder -u --database dbs/amrfinderplus_db/` in production; skips in test mode (touches sentinel only). `contig_amr` now depends on `.amrfinder_db.done` and passes `--database`.
+- `mags.smk`: `mag_amr` now depends on `.amrfinder_db.done` and passes `--database`.
+- `Snakefile`: `init_amrfinder_db` added to `localrules`.
+
+Test run (9/9 re-run jobs, all pass): `init_amrfinder_db` skips download in test mode; `contig_amr` and `mag_amr` still produce empty output (expected — no AMRFinderPlus DB in test mode).
+
+### Current pipeline state
+- HEAD: `9d5fd18` — pushed to `origin/main`.
+- Test mode: 34 jobs complete (full DAG), 9 re-run on code-change trigger.
+- Production: first run will download ~600 MB AMRFinderPlus DB to `dbs/amrfinderplus_db/`. Subsequent runs skip download (idempotent sentinel check).
+
+### Known issues / next steps
+- Contig/MAG AMR output will remain empty in test mode (no DB downloaded). This is expected behaviour.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
