@@ -661,3 +661,58 @@ Dry-run validated: `snakemake -n --config test=True` completes with exit 0, 37 j
 ### Known issues / next steps
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2026-03-23 (session 23)
+
+### What was done
+
+**Fix: wget --show-progress for non-TTY contexts**
+
+`wget` suppresses its progress bar when stdout is a pipe (not a TTY). Our previous
+`2>&1 | tee -a {log}` pattern meant wget ran silently even though tee was present. Added
+`--show-progress` to all 7 wget calls in `initiate_dbs` and `init_mmseqs_db` to force
+progress output regardless of TTY. Commit `62d6159`.
+
+**Feature: Reorganize dbs/ directory into logical subdirectories**
+
+Before: all short-reads assets (AMR_CDS.fa, afp_db.*, scg_db.dmnd, human genome, marker
+FASTAs/indices, ReferenceGeneCatalog.txt) and all per-stage sentinels were scattered flat at
+the dbs/ root alongside subdirectory databases.
+
+After (`28a61db`):
+```
+dbs/
+├── short_reads/        # everything initiate_dbs creates (flat files + sentinels)
+├── genomad_db/         # sentinel co-located: genomad_db/.done
+├── amrfinderplus_db/   # sentinel co-located: amrfinderplus_db/.done
+├── uniref50/           # sentinel co-located: uniref50/.done
+└── checkm2/            # sentinel co-located: checkm2/.done
+```
+Added `_SR_DBS_DIR = dbs/short_reads/` to `common.smk`. Sentinel naming standardised
+to `.done` (no `.txt` suffix). All four rule files updated; 37-job dry-run passes.
+
+**Note for HPC users:** existing dbs will need to be moved into the new subdirectory layout
+or the pipeline will re-download. Move commands:
+```bash
+mkdir -p dbs/short_reads
+mv dbs/{AMR_CDS.fa,ReferenceGeneCatalog.txt,afp_db.*,scg_db.dmnd,GCF_*fna.gz,pBI143.fasta,crAss001.fasta,markers.fa,markers_db.*} dbs/short_reads/
+# rename old sentinels
+for f in afp scg h_genome markers metabolic; do
+    [ -f dbs/.${f}.done.txt ] && mv dbs/.${f}.done.txt dbs/short_reads/.${f}.done
+done
+mv dbs/.genomad.db.done.txt dbs/genomad_db/.done 2>/dev/null || true
+mv dbs/.amrfinder_db.done dbs/amrfinderplus_db/.done 2>/dev/null || true
+mv dbs/.mmseqs_db.done dbs/uniref50/.done 2>/dev/null || true
+mv dbs/.checkm2.done dbs/checkm2/.done 2>/dev/null || true
+```
+
+### Current pipeline state
+- HEAD: `28a61db` — pushed to `origin/main`.
+- Dry-run: 37-job DAG valid.
+- Production run on HPC is in progress (downloading DBs).
+
+### Known issues / next steps
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
