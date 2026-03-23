@@ -4,7 +4,7 @@
 
 rule init_genomad:
     output:
-        genomad_db   = os.path.join(_DBS_DIR, ".genomad.db.done.txt")
+        genomad_db   = os.path.join(_DBS_DIR, "genomad_db", ".done")
     params:
         dbs_dir = _DBS_DIR
     log:
@@ -84,7 +84,7 @@ rule contigs:
 rule genomad:
     input:
         contigs      = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        genomad_db   = os.path.join(_DBS_DIR, ".genomad.db.done.txt")
+        genomad_db   = os.path.join(_DBS_DIR, "genomad_db", ".done")
     output:
         genomad      = directory(os.path.join(output_dir, "data", "genomad", "{sample}")),
         plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid.fna"),
@@ -163,7 +163,7 @@ rule mobmess:
 
 rule init_mmseqs_db:
     output:
-        done = os.path.join(_DBS_DIR, ".mmseqs_db.done")
+        done = os.path.join(_DBS_DIR, "uniref50", ".done")
     params:
         test_mode    = _TEST,
         db_prefix    = _UNIREF50_DB,
@@ -261,7 +261,7 @@ rule prodigal:
 rule init_amrfinder_db:
     """Download the AMRFinderPlus database to dbs/amrfinderplus_db/. Skipped in test mode."""
     output:
-        done = os.path.join(_DBS_DIR, ".amrfinder_db.done")
+        done = os.path.join(_AFP_DB_DIR, ".done")
     params:
         db_dir    = _AFP_DB_DIR,
         test_mode = _TEST
@@ -300,7 +300,7 @@ rule contig_amr:
         contigs     = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
         faa         = os.path.join(output_dir, "data", "prodigal", "{sample}.faa"),
         gff         = os.path.join(output_dir, "data", "prodigal", "{sample}.gff"),
-        afp_db_done = os.path.join(_DBS_DIR, ".amrfinder_db.done")
+        afp_db_done = os.path.join(_AFP_DB_DIR, ".done")
     output:
         tsv = os.path.join(output_dir, "data", "amr_contigs", "{sample}_contig_amr.tsv")
     params:
@@ -391,7 +391,7 @@ rule mge_annotation:
 rule mmseqs_taxonomy:
     input:
         contigs  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        db_done  = os.path.join(_DBS_DIR, ".mmseqs_db.done")
+        db_done  = os.path.join(_DBS_DIR, "uniref50", ".done")
     output:
         lca = os.path.join(output_dir, "data", "mmseqs", "{sample}_lca.tsv")
     params:

@@ -31,7 +31,8 @@ else:
 #   but writes built indices to the same dbs/ directory.
 # ---------------------------------------------------------------------------
 
-_DBS_DIR = os.path.join(_REPO, "dbs")
+_DBS_DIR    = os.path.join(_REPO, "dbs")
+_SR_DBS_DIR = os.path.join(_DBS_DIR, "short_reads")   # initiate_dbs artifacts
 _SCG_DB = (
     os.path.join(_REPO, "test", "dbs", "scg", "SCGs_40.fasta") if _TEST
     else os.path.join(_REPO, "workflow", "resources", "SCGs_40_All.fasta")

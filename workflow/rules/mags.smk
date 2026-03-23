@@ -21,7 +21,7 @@ import os
 
 rule init_checkm2_db:
     output:
-        done = os.path.join(_DBS_DIR, ".checkm2.done")
+        done = os.path.join(_DBS_DIR, "checkm2", ".done")
     params:
         db_dir    = os.path.join(_DBS_DIR, "checkm2"),
         db_path   = _CHECKM2_DB,
@@ -152,7 +152,7 @@ checkpoint mag_prodigal:
 rule mag_amr:
     input:
         done        = os.path.join(output_dir, "data", "bins", "{sample}", ".prodigal.done"),
-        afp_db_done = os.path.join(_DBS_DIR, ".amrfinder_db.done")
+        afp_db_done = os.path.join(_AFP_DB_DIR, ".done")
     output:
         tsv  = os.path.join(output_dir, "data", "bins", "{sample}", "mag_amr.tsv")
     params:
@@ -305,7 +305,7 @@ rule mag_taxonomy:
 rule mag_metabolism:
     input:
         done          = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"),
-        metabolic_done = os.path.join(_DBS_DIR, ".metabolic.done.txt")
+        metabolic_done = os.path.join(_SR_DBS_DIR, ".metabolic.done")
     output:
         done = os.path.join(output_dir, "data", "bins", "{sample}", ".metabolic.done")
     params:
@@ -344,7 +344,7 @@ rule mag_metabolism:
 rule mag_qc:
     input:
         done         = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"),
-        checkm2_done = os.path.join(_DBS_DIR, ".checkm2.done")
+        checkm2_done = os.path.join(_DBS_DIR, "checkm2", ".done")
     output:
         tsv  = os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv")
     params:

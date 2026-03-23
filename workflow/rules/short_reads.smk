@@ -4,15 +4,15 @@
 
 rule initiate_dbs:
     output:
-        afp_db         = os.path.join(_DBS_DIR, ".afp.done.txt"),
-        scg_db         = os.path.join(_DBS_DIR, ".scg.done.txt"),
-        afp_metadata   = os.path.join(_DBS_DIR, "ReferenceGeneCatalog.txt"),
-        h_genome_done  = os.path.join(_DBS_DIR, ".h_genome.done.txt"),
-        markers_db     = os.path.join(_DBS_DIR, ".markers.done.txt"),
-        metabolic_done = os.path.join(_DBS_DIR, ".metabolic.done.txt")
+        afp_db         = os.path.join(_SR_DBS_DIR, ".afp.done"),
+        scg_db         = os.path.join(_SR_DBS_DIR, ".scg.done"),
+        afp_metadata   = os.path.join(_SR_DBS_DIR, "ReferenceGeneCatalog.txt"),
+        h_genome_done  = os.path.join(_SR_DBS_DIR, ".h_genome.done"),
+        markers_db     = os.path.join(_SR_DBS_DIR, ".markers.done"),
+        metabolic_done = os.path.join(_SR_DBS_DIR, ".metabolic.done")
     params:
-        dbs_dir          = _DBS_DIR,
-        h_genome_path    = os.path.join(_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        dbs_dir          = _SR_DBS_DIR,
+        h_genome_path    = os.path.join(_SR_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
         scg_db           = _SCG_DB,
         skip_metabolic   = config.get("skip_metabolic", False),
         metabolic_dir    = _METABOLIC_DIR,
@@ -141,12 +141,12 @@ rule short_reads:
     input:
         r1          = get_r1,
         r2          = get_r2,
-        afp_db      = os.path.join(_DBS_DIR, ".afp.done.txt"),
-        scg_db      = os.path.join(_DBS_DIR, ".scg.done.txt"),
-        h_genome    = os.path.join(_DBS_DIR, ".h_genome.done.txt"),
-        markers_db  = os.path.join(_DBS_DIR, ".markers.done.txt")
+        afp_db      = os.path.join(_SR_DBS_DIR, ".afp.done"),
+        scg_db      = os.path.join(_SR_DBS_DIR, ".scg.done"),
+        h_genome    = os.path.join(_SR_DBS_DIR, ".h_genome.done"),
+        markers_db  = os.path.join(_SR_DBS_DIR, ".markers.done")
     params:
-        h_genome    = os.path.join(_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        h_genome    = os.path.join(_SR_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
         r1_clean    = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
@@ -223,7 +223,7 @@ rule short_reads_summary:
         scgs            = expand(os.path.join(output_dir, "data", "alignments", "{sample}.scgs"), sample=samples),
         npos            = expand(os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.npo"), sample=samples),
         jsons           = expand(os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"), sample=samples),
-        afp_metadata    = os.path.join(_DBS_DIR, "ReferenceGeneCatalog.txt"),
+        afp_metadata    = os.path.join(_SR_DBS_DIR, "ReferenceGeneCatalog.txt"),
         markers_files   = expand(os.path.join(output_dir, "data", "alignments", "{sample}.markers.res"), sample=samples)
     output:
         fastp       = os.path.join(output_dir, "fastp_summary.csv"),
