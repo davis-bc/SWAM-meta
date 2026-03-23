@@ -716,3 +716,19 @@ mv dbs/.checkm2.done dbs/checkm2/.done 2>/dev/null || true
 ### Known issues / next steps
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+**README update (commit `d1b0f7e`):**
+- Removed the manual "Add SCG reference database" step — `SCGs_40_All.fasta` now ships with the repo
+- Production setup reduced to two required config keys (`in_dir`, `out_dir`)
+- Optional databases table expanded: added geNomad DB and AMRFinderPlus protein DB rows with accurate sizes and `dbs/` subdirectory paths
+- Repository structure updated to reflect the new `dbs/` subdirectory layout
+- Production setup steps renumbered 2/3/4/5 → 1/2/3/4
+
+### Current pipeline state
+- HEAD: `d1b0f7e` — pushed to `origin/main`.
+- Production run on HPC is in progress (downloading DBs with visible progress bars).
+
+### Known issues / next steps
+- HPC users with existing `dbs/` need to manually move files into the new subdirectory layout (move commands in session 23 entry).
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
