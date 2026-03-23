@@ -58,13 +58,13 @@ rule initiate_dbs:
 
             if [ ! -f "{params.dbs_dir}/AMR_CDS.fa" ]; then
                 echo "initiate_dbs: downloading AMRFinderPlus CDS..."
-                wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa >> {log} 2>&1
+                wget -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa 2>&1 | tee -a {log}
             else
                 echo "initiate_dbs: AMR_CDS.fa already present, skipping download"
             fi
             if [ ! -f "{output.afp_metadata}" ]; then
                 echo "initiate_dbs: downloading ReferenceGeneCatalog.txt..."
-                wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt >> {log} 2>&1
+                wget -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt 2>&1 | tee -a {log}
             else
                 echo "initiate_dbs: ReferenceGeneCatalog.txt already present, skipping"
             fi
@@ -89,7 +89,7 @@ rule initiate_dbs:
 
             if [ ! -f "{params.h_genome_path}" ]; then
                 echo "initiate_dbs: downloading human reference genome..."
-                wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz >> {log} 2>&1
+                wget -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz 2>&1 | tee -a {log}
             else
                 echo "initiate_dbs: human reference genome already present, skipping"
             fi
@@ -97,10 +97,10 @@ rule initiate_dbs:
 
             if [ ! -f "{params.dbs_dir}/markers.fa" ]; then
                 echo "initiate_dbs: downloading anthropogenic markers (pBI143, crAss001)..."
-                wget -q -O {params.dbs_dir}/pBI143.fasta \
-                    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=U30316.1&rettype=fasta&retmode=text" >> {log} 2>&1
-                wget -q -O {params.dbs_dir}/crAss001.fasta \
-                    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_049977.1&rettype=fasta&retmode=text" >> {log} 2>&1
+                wget -O {params.dbs_dir}/pBI143.fasta \
+                    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=U30316.1&rettype=fasta&retmode=text" 2>&1 | tee -a {log}
+                wget -O {params.dbs_dir}/crAss001.fasta \
+                    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_049977.1&rettype=fasta&retmode=text" 2>&1 | tee -a {log}
                 cat {params.dbs_dir}/pBI143.fasta {params.dbs_dir}/crAss001.fasta \
                     > {params.dbs_dir}/markers.fa
             else

@@ -41,7 +41,7 @@ rule init_checkm2_db:
             echo "CheckM2: database already exists, skipping download"
         else
             echo "CheckM2: downloading database (~3 GB)..."
-            checkm2 database --download --path {params.db_dir} >> {log} 2>&1
+            checkm2 database --download --path {params.db_dir} 2>&1 | tee -a {log}
             echo "CheckM2: database ready"
         fi
         touch {output.done}

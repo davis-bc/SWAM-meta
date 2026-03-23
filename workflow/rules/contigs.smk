@@ -17,7 +17,7 @@ rule init_genomad:
         
         echo "geNomad: downloading database..."
         cd {params.dbs_dir}
-        curl -L https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz 2>> {log} | tar -xz 2>> {log}
+        curl -L --progress-bar https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz 2> >(tee -a {log} >&2) | tar -xz 2>> {log}
         touch {output.genomad_db}
         echo "geNomad: database ready"
         
@@ -201,24 +201,24 @@ rule init_mmseqs_db:
                 mkdir -p "$TAX_DIR" "$TMP_DIR"
 
                 echo "MMseqs2: downloading UniRef50 FASTA (~9 GB)..."
-                wget -q -O "$UNIREF_FASTA.gz" \
-                    https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz >> {log} 2>&1
+                wget -O "$UNIREF_FASTA.gz" \
+                    https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz 2>&1 | tee -a {log}
                 echo "MMseqs2: decompressing UniRef50..."
                 gunzip -f "$UNIREF_FASTA.gz" >> {log} 2>&1
 
                 echo "MMseqs2: downloading NCBI taxonomy..."
-                wget -q -P "$TAX_DIR" \
-                    https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz >> {log} 2>&1
+                wget -P "$TAX_DIR" \
+                    https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz 2>&1 | tee -a {log}
                 tar -xzf "$TAX_DIR/taxdump.tar.gz" -C "$TAX_DIR" >> {log} 2>&1
 
                 echo "MMseqs2: building taxonomy database (this may take several hours)..."
-                mmseqs createdb "$UNIREF_FASTA" {params.db_prefix} >> {log} 2>&1
+                mmseqs createdb "$UNIREF_FASTA" {params.db_prefix} 2>&1 | tee -a {log}
                 mmseqs createtaxdb {params.db_prefix} "$TMP_DIR" \
                     --ncbi-tax-dump "$TAX_DIR" \
-                    --threads {resources.threads} >> {log} 2>&1
+                    --threads {resources.threads} 2>&1 | tee -a {log}
                 mmseqs createindex {params.db_prefix} "$TMP_DIR" \
                     --search-type 2 \
-                    --threads {resources.threads} >> {log} 2>&1
+                    --threads {resources.threads} 2>&1 | tee -a {log}
 
                 rm -f "$UNIREF_FASTA"
                 rm -rf "$TMP_DIR" "$TAX_DIR"
@@ -277,11 +277,11 @@ rule init_amrfinder_db:
             echo "init_amrfinder_db: database already exists, skipping download"
         else
             echo "init_amrfinder_db: downloading AMRFinderPlus database (~600 MB)..."
-            amrfinder --update >> {log} 2>&1
+            amrfinder --update 2>&1 | tee -a {log}
             # amrfinder --update downloads to $CONDA_PREFIX/share/amrfinderplus/data/latest/
             AFP_SRC="$CONDA_PREFIX/share/amrfinderplus/data/latest"
             if [ -d "$AFP_SRC" ]; then
-                rsync -a "$AFP_SRC/" {params.db_dir}/ >> {log} 2>&1
+                rsync -a --info=progress2 "$AFP_SRC/" {params.db_dir}/ 2>&1 | tee -a {log}
                 echo "init_amrfinder_db: database ready"
             else
                 echo "ERROR: expected database at $AFP_SRC not found" >> {log}

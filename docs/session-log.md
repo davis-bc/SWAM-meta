@@ -618,3 +618,46 @@ Key outputs verified in `output/`:
 - MAG stage not tested in production yet (`run_mags: True` requires GTDB-tk, CheckM2 databases on HPC).
 - SLURM profiles not yet tested — user to test on HPC.
 - Pushed to `origin/main` (commit `81505e3`).
+
+---
+
+## 2026-03-23 (session 22)
+
+### What was done
+
+**Fix: Show download progress for all database init rules**
+
+In production mode, `wget -q` + `>> {log} 2>&1` silenced all download progress. Users saw an
+echo message ("downloading human reference genome...") then nothing for 30–60+ minutes, making
+the pipeline appear hung.
+
+**Changes (3 files):**
+
+- `workflow/rules/short_reads.smk` — `initiate_dbs`: removed `-q` from all 5 `wget` calls;
+  changed `>> {log} 2>&1` → `2>&1 | tee -a {log}` so progress appears on the terminal and
+  is also written to the log.
+
+- `workflow/rules/contigs.smk`:
+  - `init_genomad`: changed `curl -L ... 2>> {log} | tar -xz` to
+    `curl -L --progress-bar ... 2> >(tee -a {log} >&2) | tar -xz` — uses process substitution
+    to tee curl's stderr (progress) while keeping the binary data stream piped cleanly to tar.
+  - `init_mmseqs_db`: removed `-q` from both `wget` calls; changed `>> {log} 2>&1` →
+    `2>&1 | tee -a {log}` for both wget downloads and all three long mmseqs commands
+    (`createdb`, `createtaxdb`, `createindex`).
+  - `init_amrfinder_db`: changed `amrfinder --update >> {log} 2>&1` →
+    `amrfinder --update 2>&1 | tee -a {log}`; added `--info=progress2` to `rsync` and
+    changed to `2>&1 | tee -a {log}`.
+
+- `workflow/rules/mags.smk` — `init_checkm2_db`: changed
+  `checkm2 database --download ... >> {log} 2>&1` → `2>&1 | tee -a {log}`.
+
+Dry-run validated: `snakemake -n --config test=True` completes with exit 0, 37 jobs.
+
+### Current pipeline state
+- HEAD: this commit, pushed to `origin/main`.
+- Test mode: 37-job DAG valid.
+- Production: all DB-init rules now print download progress to the terminal.
+
+### Known issues / next steps
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
