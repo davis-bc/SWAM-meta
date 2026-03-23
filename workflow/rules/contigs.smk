@@ -273,12 +273,20 @@ rule init_amrfinder_db:
         mkdir -p {params.db_dir}
         if [ "{params.test_mode}" = "True" ]; then
             echo "init_amrfinder_db: test mode — skipping database download"
-        elif [ -d "{params.db_dir}/latest" ]; then
+        elif [ -f "{params.db_dir}/AMR_CDS.fa" ]; then
             echo "init_amrfinder_db: database already exists, skipping download"
         else
             echo "init_amrfinder_db: downloading AMRFinderPlus database (~600 MB)..."
-            amrfinder -u --database {params.db_dir} >> {log} 2>&1
-            echo "init_amrfinder_db: database ready"
+            amrfinder --update >> {log} 2>&1
+            # amrfinder --update downloads to $CONDA_PREFIX/share/amrfinderplus/data/latest/
+            AFP_SRC="$CONDA_PREFIX/share/amrfinderplus/data/latest"
+            if [ -d "$AFP_SRC" ]; then
+                rsync -a "$AFP_SRC/" {params.db_dir}/ >> {log} 2>&1
+                echo "init_amrfinder_db: database ready"
+            else
+                echo "ERROR: expected database at $AFP_SRC not found" >> {log}
+                exit 1
+            fi
         fi
         touch {output.done}
         """

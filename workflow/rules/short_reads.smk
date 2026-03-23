@@ -7,11 +7,12 @@ rule initiate_dbs:
         afp_db         = os.path.join(_DBS_DIR, ".afp.done.txt"),
         scg_db         = os.path.join(_DBS_DIR, ".scg.done.txt"),
         afp_metadata   = os.path.join(_DBS_DIR, "ReferenceGeneCatalog.txt"),
-        h_genome       = os.path.join(_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        h_genome_done  = os.path.join(_DBS_DIR, ".h_genome.done.txt"),
         markers_db     = os.path.join(_DBS_DIR, ".markers.done.txt"),
         metabolic_done = os.path.join(_DBS_DIR, ".metabolic.done.txt")
     params:
         dbs_dir          = _DBS_DIR,
+        h_genome_path    = os.path.join(_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
         scg_db           = _SCG_DB,
         skip_metabolic   = config.get("skip_metabolic", False),
         metabolic_dir    = _METABOLIC_DIR,
@@ -40,7 +41,8 @@ rule initiate_dbs:
             diamond makedb --in {params.scg_db} \
                            -d {params.dbs_dir}/scg_db --quiet >> {log} 2>&1
             touch {output.scg_db}
-            cp {params.test_human} {output.h_genome}
+            cp {params.test_human} {params.h_genome_path}
+            touch {output.h_genome_done}
 
             echo "initiate_dbs: indexing anthropogenic markers (test)..."
             cat {params.test_markers_dir}/pBI143.fasta \
@@ -54,32 +56,63 @@ rule initiate_dbs:
 
         else
 
-            echo "initiate_dbs: downloading AMRFinderPlus database..."
-            wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa >> {log} 2>&1
-            wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt >> {log} 2>&1
+            if [ ! -f "{params.dbs_dir}/AMR_CDS.fa" ]; then
+                echo "initiate_dbs: downloading AMRFinderPlus CDS..."
+                wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa >> {log} 2>&1
+            else
+                echo "initiate_dbs: AMR_CDS.fa already present, skipping download"
+            fi
+            if [ ! -f "{output.afp_metadata}" ]; then
+                echo "initiate_dbs: downloading ReferenceGeneCatalog.txt..."
+                wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt >> {log} 2>&1
+            else
+                echo "initiate_dbs: ReferenceGeneCatalog.txt already present, skipping"
+            fi
 
-            echo "initiate_dbs: indexing AMRFinderPlus database..."
-            kma index -i {params.dbs_dir}/AMR_CDS.fa \
-                      -o {params.dbs_dir}/afp_db >> {log} 2>&1
+            if [ ! -f "{params.dbs_dir}/afp_db.name" ]; then
+                echo "initiate_dbs: indexing AMRFinderPlus database..."
+                kma index -i {params.dbs_dir}/AMR_CDS.fa \
+                          -o {params.dbs_dir}/afp_db >> {log} 2>&1
+            else
+                echo "initiate_dbs: KMA AFP index already present, skipping"
+            fi
             touch {output.afp_db}
 
-            echo "initiate_dbs: building SCG DIAMOND database..."
-            diamond makedb --in {params.scg_db} \
-                           -d {params.dbs_dir}/scg_db --quiet >> {log} 2>&1
+            if [ ! -f "{params.dbs_dir}/scg_db.dmnd" ]; then
+                echo "initiate_dbs: building SCG DIAMOND database..."
+                diamond makedb --in {params.scg_db} \
+                               -d {params.dbs_dir}/scg_db --quiet >> {log} 2>&1
+            else
+                echo "initiate_dbs: SCG DIAMOND database already present, skipping"
+            fi
             touch {output.scg_db}
 
-            echo "initiate_dbs: downloading human reference genome..."
-            wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz >> {log} 2>&1
+            if [ ! -f "{params.h_genome_path}" ]; then
+                echo "initiate_dbs: downloading human reference genome..."
+                wget -q -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz >> {log} 2>&1
+            else
+                echo "initiate_dbs: human reference genome already present, skipping"
+            fi
+            touch {output.h_genome_done}
 
-            echo "initiate_dbs: downloading anthropogenic markers (pBI143, crAss001)..."
-            wget -q -O {params.dbs_dir}/pBI143.fasta \
-                "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=U30316.1&rettype=fasta&retmode=text" >> {log} 2>&1
-            wget -q -O {params.dbs_dir}/crAss001.fasta \
-                "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_049977.1&rettype=fasta&retmode=text" >> {log} 2>&1
-            cat {params.dbs_dir}/pBI143.fasta {params.dbs_dir}/crAss001.fasta \
-                > {params.dbs_dir}/markers.fa
-            kma index -i {params.dbs_dir}/markers.fa \
-                      -o {params.dbs_dir}/markers_db >> {log} 2>&1
+            if [ ! -f "{params.dbs_dir}/markers.fa" ]; then
+                echo "initiate_dbs: downloading anthropogenic markers (pBI143, crAss001)..."
+                wget -q -O {params.dbs_dir}/pBI143.fasta \
+                    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=U30316.1&rettype=fasta&retmode=text" >> {log} 2>&1
+                wget -q -O {params.dbs_dir}/crAss001.fasta \
+                    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_049977.1&rettype=fasta&retmode=text" >> {log} 2>&1
+                cat {params.dbs_dir}/pBI143.fasta {params.dbs_dir}/crAss001.fasta \
+                    > {params.dbs_dir}/markers.fa
+            else
+                echo "initiate_dbs: markers.fa already present, skipping download"
+            fi
+            if [ ! -f "{params.dbs_dir}/markers_db.name" ]; then
+                echo "initiate_dbs: indexing anthropogenic markers..."
+                kma index -i {params.dbs_dir}/markers.fa \
+                          -o {params.dbs_dir}/markers_db >> {log} 2>&1
+            else
+                echo "initiate_dbs: KMA markers index already present, skipping"
+            fi
             touch {output.markers_db}
 
             if [ "{params.skip_metabolic}" = "True" ]; then
@@ -110,8 +143,10 @@ rule short_reads:
         r2          = get_r2,
         afp_db      = os.path.join(_DBS_DIR, ".afp.done.txt"),
         scg_db      = os.path.join(_DBS_DIR, ".scg.done.txt"),
-        h_genome    = os.path.join(_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        h_genome    = os.path.join(_DBS_DIR, ".h_genome.done.txt"),
         markers_db  = os.path.join(_DBS_DIR, ".markers.done.txt")
+    params:
+        h_genome    = os.path.join(_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
         r1_clean    = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
@@ -142,7 +177,7 @@ rule short_reads:
         echo "[{wildcards.sample}] fastp: done"
 
         echo "[{wildcards.sample}] minimap2: filtering host reads..."
-        minimap2 -t {resources.threads} -ax sr {input.h_genome} "$TMP_R1" "$TMP_R2" 2>> {log} \
+        minimap2 -t {resources.threads} -ax sr {params.h_genome} "$TMP_R1" "$TMP_R2" 2>> {log} \
         | samtools view -u -f 12 -F 256 - 2>> {log} \
         | samtools fastq -n -1 >(pigz -p {resources.threads} > {output.r1_clean}) \
                  -2 >(pigz -p {resources.threads} > {output.r2_clean}) \
