@@ -201,13 +201,13 @@ rule init_mmseqs_db:
                 mkdir -p "$TAX_DIR" "$TMP_DIR"
 
                 echo "MMseqs2: downloading UniRef50 FASTA (~9 GB)..."
-                wget -O "$UNIREF_FASTA.gz" \
+                wget --show-progress -O "$UNIREF_FASTA.gz" \
                     https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz 2>&1 | tee -a {log}
                 echo "MMseqs2: decompressing UniRef50..."
                 gunzip -f "$UNIREF_FASTA.gz" >> {log} 2>&1
 
                 echo "MMseqs2: downloading NCBI taxonomy..."
-                wget -P "$TAX_DIR" \
+                wget --show-progress -P "$TAX_DIR" \
                     https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz 2>&1 | tee -a {log}
                 tar -xzf "$TAX_DIR/taxdump.tar.gz" -C "$TAX_DIR" >> {log} 2>&1
 
