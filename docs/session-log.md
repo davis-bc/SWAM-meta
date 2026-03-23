@@ -586,3 +586,35 @@ Test run (9/9 re-run jobs, all pass): `init_amrfinder_db` skips download in test
 - Contig/MAG AMR output will remain empty in test mode (no DB downloaded). This is expected behaviour.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2026-03-23 (session 6)
+
+### What was done
+- **First production-mode end-to-end test**: Ran short reads + contigs pipeline (no MAGs) in production mode using mock1/mock2 test data, output to `output/`.
+  Command: `snakemake --scheduler greedy --use-conda --cores 8 --snakefile workflow/Snakefile --config in_dir=.../test/data out_dir=.../output run_mags=False skip_metabolic=True`
+- **Fixed `workflow/resources/SCGs_40_All.fa` → `SCGs_40_All.fasta`**: File was misnamed; `common.smk` always referenced `.fasta`. Renamed and committed.
+- **Fixed `initiate_dbs` (short_reads.smk) — idempotent production branch**: 
+  - Replaced `h_genome` file output with `.h_genome.done.txt` sentinel so Snakemake never manages the 928 MB human genome as an output (would delete it on re-run).
+  - Added separate idempotency guards for each asset: `AMR_CDS.fa`, `ReferenceGeneCatalog.txt`, human genome, `markers.fa`, KMA AFP index, KMA markers index.
+  - `short_reads` rule now consumes `.h_genome.done.txt` as input and passes the actual genome path via `params.h_genome`.
+- **Fixed `init_amrfinder_db` (contigs.smk)**: `amrfinder -u --database <dir>` is invalid in AMRFinder 4.x. Fixed to `amrfinder --update` (updates default conda env location) then `rsync` from `$CONDA_PREFIX/share/amrfinderplus/data/latest/` to `dbs/amrfinderplus_db/`. Existence check updated to `-f AMR_CDS.fa`.
+- All 24 jobs completed successfully in ~25 minutes on 8 cores (no MAGs).
+
+### Current pipeline state
+✅ **Production mode (short reads + contigs) passes** — all 24 jobs for mock1 + mock2.
+
+Key outputs verified in `output/`:
+| File | Size |
+|------|------|
+| `AMR_unified.csv` | 15 KB, 79 rows |
+| `AMR_abundance_summary.csv` | 103 B |
+| `contig_summary.tsv` | 59 KB, 866 rows |
+| `fastp_summary.csv` | 427 B |
+
+### Known issues / next steps
+- Production run is still sequential (one sample at a time, 8 cores) because each rule claims all 8 cores. With more cores (e.g., 16+) two samples would run in parallel.
+- MAG stage not tested in production yet (`run_mags: True` requires GTDB-tk, CheckM2 databases on HPC).
+- SLURM profiles not yet tested — user to test on HPC.
+- Pushed to `origin/main` (commit `81505e3`).
