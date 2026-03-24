@@ -814,3 +814,55 @@ Both dry-runs pass: `snakemake -n --scheduler greedy` (production) and
 - MGE JSONDecodeError in MobileElementFinder — upstream bug in `-outfmt 15` BLAST output
   parsing; `|| true` handles gracefully. Awaiting upstream fix.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+
+---
+
+## 2026-03-24 (session 26)
+
+### What was done
+
+**Median-SCG normalisation for convergent CPG values (`19e17bc`)**
+
+Replaced the old `n_genomes = sum(aln_len/gene_len)/40` formula with a per-gene,
+median-based SCG depth calculation. The new formula uses reads/base as the common
+unit for both evidence streams, making short-read and contig CPG values directly
+comparable and convergent in `AMR_unified`.
+
+**Formula (both scripts now identical):**
+```
+SCG_depth_i      = n_reads_mapped_to_SCG_i / (slen_i × 3)    # reads/base
+median_SCG_depth = median(SCG_depth_i for all detected SCGs)
+cpg              = alignment_depth / median_SCG_depth
+```
+
+- **`short_reads_processing.R`**: replaced `genome.counts` block with `scg_norm`
+  computing per-gene SCG depth (reads/base). Diagnostic `message()` reports
+  number of SCGs detected and median depth. Warns when <10 SCGs detected.
+  CPG becomes NA when no SCGs detected (propagated through AMR_unified as 0).
+  Both AMR and anthropogenic marker CPG updated.
+- **`contig_abundance.py`**: same median-SCG calculation from the shared DIAMOND
+  file. `abundance_cpg = NaN` when median_scg_depth is unavailable (produces
+  empty cell in TSV; handled as 0.0 by `amr_unified.py`).
+
+**Why this converges:**
+- KMA Depth (short reads) is in reads/base; samtools mean depth (contigs) is in
+  reads/base. Both divide by median_SCG_depth (reads/base). The ratio is
+  dimensionless and comparable between methods.
+- If a gene has the same true coverage depth: short_read_cpg ≈ contig_cpg. ✓
+- Median is more robust than mean/40 for diverse communities (only needs >half
+  of SCGs to have ≥1 read for a non-zero median).
+
+**Reference:** Bengtsson-Palme et al. (2017) — "Population-level impacts of
+antibiotic usage on the human gut microbiome."
+
+### Current pipeline state
+- HEAD: `19e17bc`, pushed to `origin/main`.
+- All CPG normalisation now uses median_SCG_depth (reads/base) consistently.
+- AMR_unified short_reads_cpg and contig_cpg are now on the same scale.
+
+### Known issues / next steps
+- MGE JSONDecodeError in MobileElementFinder — upstream bug; `|| true` handles
+  gracefully. Awaiting upstream fix.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- Recommend an end-to-end test run on real production samples to validate that
+  CPG values are now in a plausible range (tetM ~0.1–2.0 cpg expected).
