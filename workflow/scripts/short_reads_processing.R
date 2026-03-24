@@ -143,24 +143,66 @@ scg <- do.call(bind_rows, lapply(scgs, function(f) {
   x
 }))
 
-# estimate genome counts as average coverage depth of 40 SCGs
+# ---------------------------------------------------------------------------
+# Estimate median single-copy gene (SCG) coverage depth (reads / base).
+#
+# For each of the 40 SCG proteins with ≥1 aligned read:
+#   SCG_depth_i = n_reads_i / (slen_i × 3)          # slen is amino acids → ×3 for nt
+#
+# CPG = ARG_depth / median_SCG_depth
+#   Both numerator (KMA Depth) and denominator are in reads/base, so the
+#   ratio is dimensionless and directly comparable between the read-based
+#   and assembly-based evidence streams in AMR_unified.
+#
+# Reference: Bengtsson-Palme et al. (2017) - median SCG normalisation.
+# ---------------------------------------------------------------------------
 if (!is.null(scg) && nrow(scg) > 0 && "sample" %in% colnames(scg)) {
-  genome.counts <- scg %>% 
-                  group_by(sample) %>% 
-                  distinct(qseqid, .keep_all = T) %>% 
-                  summarise(n_genomes = sum(length/slen)/40)
+  scg_norm <- scg %>%
+    group_by(sample) %>%
+    distinct(qseqid, .keep_all = TRUE) %>%          # one alignment per read (best hit)
+    group_by(sample, sseqid) %>%
+    summarise(
+      scg_reads   = n(),
+      gene_len_nt = first(slen) * 3L,               # protein aa → nucleotide length
+      .groups = "drop"
+    ) %>%
+    mutate(scg_depth = scg_reads / gene_len_nt) %>% # reads/base per SCG gene
+    group_by(sample) %>%
+    summarise(
+      n_scg_detected   = n(),
+      median_scg_depth = median(scg_depth),
+      .groups = "drop"
+    )
+
+  # Warn for samples with very few detected SCGs (normaliser will be noisy)
+  low_scg <- scg_norm %>% filter(n_scg_detected < 10)
+  if (nrow(low_scg) > 0) {
+    message("WARNING: <10 SCGs detected in sample(s): ",
+            paste(low_scg$sample, "(", low_scg$n_scg_detected, "SCGs)", collapse = ", "),
+            " — CPG estimates may be unreliable.")
+  }
+  message("SCG normalisation: samples=", nrow(scg_norm),
+          "  median SCGs detected=", median(scg_norm$n_scg_detected),
+          "  median SCG depth range=[",
+          round(min(scg_norm$median_scg_depth), 6), ", ",
+          round(max(scg_norm$median_scg_depth), 6), "]")
 } else {
-  # No SCG hits: assign 1 genome per sample as fallback
-  genome.counts <- tibble(sample = sub(".scgs", "", basename(scgs)), n_genomes = 1)
+  # No SCG hits at all — cpg will be NA for all genes
+  message("WARNING: No SCG alignments found. CPG values will be NA.")
+  all_samples <- sub(".scgs", "", basename(scgs))
+  scg_norm <- tibble(sample = all_samples, n_scg_detected = 0L, median_scg_depth = NA_real_)
 }
 
-# estimate copies per genome (cpg) as gene coverage depth / estimated genome counts
+# estimate copies per genome (cpg):
+#   cpg = KMA_Depth / median_SCG_depth   (both in reads/base → dimensionless)
 if (!is.null(afp) && nrow(afp) > 0) {
   afp_long <-  afp %>% 
-                    left_join(genome.counts, by="sample") %>% 
+                    left_join(scg_norm, by="sample") %>% 
                     left_join(fastp_summary %>% select(sample, avg_read_length), by="sample") %>%
                     mutate(read_count = round(Depth * Template_length / avg_read_length),
-                           cpg = Depth / n_genomes) %>%
+                           cpg = if_else(!is.na(median_scg_depth) & median_scg_depth > 0,
+                                         Depth / median_scg_depth,
+                                         NA_real_)) %>%
                     filter(read_count >= 1) %>% 
                     left_join(catalog_long, by=c("refseq_nucleotide_accession" = "key")) %>%
                     # Production catalog has allele/gene_family empty for many genes;
@@ -207,9 +249,11 @@ if (!is.null(markers) && nrow(markers) > 0) {
     # KMA includes the full FASTA description after the first space in the template
     # identifier; extract only the accession to allow reliable matching.
     mutate(seq_id = str_extract(template, "^\\S+")) %>%
-    left_join(genome.counts, by = "sample") %>%
+    left_join(scg_norm, by = "sample") %>%
     left_join(fastp_summary %>% select(sample, avg_read_length), by = "sample") %>%
-    mutate(cpg = Depth / n_genomes) %>%
+    mutate(cpg = if_else(!is.na(median_scg_depth) & median_scg_depth > 0,
+                          Depth / median_scg_depth,
+                          NA_real_)) %>%
     select(sample, seq_id, cpg)
 } else {
   marker_cpg <- tibble(sample = character(), seq_id = character(), cpg = double())
