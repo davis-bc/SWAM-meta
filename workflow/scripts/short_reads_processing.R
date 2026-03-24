@@ -109,9 +109,11 @@ fastp_summary <- fastp_summary %>% left_join(nps, by="sample") %>%
 ####################################################
 
 afp_metadata <- read_tsv(afp_path, show_col_types = FALSE)
+message("AMRFinder catalog: ", nrow(afp_metadata), " genes loaded from ", afp_path)
 
 catalog_long <- afp_metadata %>% 
                       pivot_longer(cols = c("refseq_nucleotide_accession", "genbank_nucleotide_accession"), values_to = "key") %>%
+                      filter(!is.na(key) & key != "") %>%
                       distinct(key, .keep_all = TRUE)
 
 afp <- do.call(bind_rows, lapply(afp_files, function(f) {
@@ -161,6 +163,12 @@ if (!is.null(afp) && nrow(afp) > 0) {
                            cpg = Depth / n_genomes) %>%
                     filter(read_count >= 1) %>% 
                     left_join(catalog_long, by=c("refseq_nucleotide_accession" = "key")) %>%
+                    # Production catalog has allele/gene_family empty for many genes;
+                    # fall back to values parsed directly from the KMA template header.
+                    mutate(
+                      allele      = coalesce(allele, allele_kma),
+                      gene_family = coalesce(gene_family, gene_family_kma)
+                    ) %>%
                     mutate(allele_pass = ifelse(Template_Identity >= 80 & Query_Identity >= 99 & !is.na(allele), "yes", "no")) %>%
                     select(sample, read_count, Depth, cpg, allele, allele_pass, gene_family, product_name, 
                            scope, type, subtype, class, subclass, refseq_nucleotide_accession)

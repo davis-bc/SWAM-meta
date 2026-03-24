@@ -104,7 +104,7 @@ rule genomad:
     shell:
         """
         echo "[{wildcards.sample}] geNomad: classifying contigs (chromosome/plasmid/phage)..."
-        genomad end-to-end {input.contigs} {output.genomad} $(dirname {input.genomad_db})/genomad_db \
+        genomad end-to-end {input.contigs} {output.genomad} $(dirname {input.genomad_db}) \
             --relaxed --cleanup --splits {params.splits} >> {log} 2>&1
         # touch missing output files (geNomad omits them when no hits are found)
         touch {output.plas_contigs} {output.plas_summary} {output.vir_summary}
@@ -345,7 +345,7 @@ rule init_mge_tool:
         mkdir -p $(dirname {output.done})
         echo "MobileElementFinder: installing..."
         pip install --no-deps --quiet mypy-extensions >> {log} 2>&1
-        pip install --no-deps --quiet MGEdb==1.1.1 >> {log} 2>&1
+        pip install --no-deps --quiet MGEdb==1.1.2 >> {log} 2>&1
         pip install --no-deps --quiet MobileElementFinder >> {log} 2>&1
         touch {output.done}
         echo "MobileElementFinder: installed"
