@@ -771,3 +771,46 @@ Dry-run validated: both `snakemake -n --scheduler greedy` and
 - HPC users with existing `dbs/` need to manually move files into the new subdirectory layout (move commands in session 23 entry).
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2025-07-14 (session 25)
+
+### What was done
+
+**Fix 1 — Separate test/production database sentinels (`e2740f7`)**
+
+Root cause of all HPC production issues (NG_MOCK genes, cpg inflation, contigs_only evidence):
+`initiate_dbs` in test mode wrote the same sentinel filenames (`.afp.done`, `.scg.done`,
+`.h_genome.done`, `.markers.done`, `.metabolic.done`) to the same `dbs/short_reads/`
+directory as production. Once test mode had run, Snakemake never re-ran `initiate_dbs` in
+production because the sentinels already existed, silently using the test KMA/DIAMOND
+databases for all samples.
+
+Fix: added `_DB_TAG = ".test" if _TEST else ""` to `common.smk`; all five sentinel filenames
+now incorporate the tag (e.g. `.afp.done` → `.afp.test.done` in test mode, `.afp.done` in
+production). `ReferenceGeneCatalog.txt` is not tagged (it's a data file overwritten on each
+`initiate_dbs` run).
+
+**Fix 2 — Drop unannotated rows from `contig_summary.tsv` (`e2740f7`)**
+
+`contig_summary.py` previously added a row for every contig, even those with no AMR or MGE
+annotation (empty `feature_type`). Removed the fallback loop; the output now contains only
+AMR and MGE annotated rows, making the file leaner and downstream joins cleaner.
+
+Both dry-runs pass: `snakemake -n --scheduler greedy` (production) and
+`snakemake -n --scheduler greedy --config test=True` (test mode).
+
+### Current pipeline state
+- HEAD: `e2740f7`, pushed to `origin/main`.
+- All sentinel contamination fixed; test and production can coexist on the same machine.
+- `contig_summary.tsv` is now annotation-only (AMR + MGE rows only).
+
+### Known issues / next steps
+- **Contig abundance normalization** — `n_genomes` from SCG DIAMOND fails for diverse
+  environmental metagenomes (very few reads align to 40 reference proteins → n_genomes ≈ 0
+  → cpg ≈ ∞). A new normalization strategy is needed; not yet determined.
+  Rejected approaches: median contig depth normalisation, n_genomes floor of 1.0.
+- MGE JSONDecodeError in MobileElementFinder — upstream bug in `-outfmt 15` BLAST output
+  parsing; `|| true` handles gracefully. Awaiting upstream fix.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
