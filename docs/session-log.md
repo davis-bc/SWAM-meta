@@ -866,3 +866,69 @@ antibiotic usage on the human gut microbiome."
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - Recommend an end-to-end test run on real production samples to validate that
   CPG values are now in a plausible range (tetM ~0.1–2.0 cpg expected).
+
+---
+
+## 2026-03-24 (session 27)
+
+### What was done
+
+**Major output refactor — revert cpg, CoverM contig abundance, drop AMR unified (`784caee`)**
+
+The median-SCG normalisation introduced in session 26 was not producing reliable
+results. The entire AMR unified table concept was also abandoned. The pipeline
+outputs are now redesigned around five clean, purpose-specific files.
+
+**CPG formula reverted:**
+- `short_reads_processing.R`: reverted from the median-SCG-depth formula back to
+  the original `n_genomes = sum(alignment_length / subject_length) / 40`.
+  `cpg = KMA_Depth / n_genomes`. Fallback: `n_genomes = 1` when no SCG hits.
+- Markers cpg uses the same `genome.counts` object.
+
+**New output 1 — `AMR_abundance_summary.csv` (short-reads only):**
+- Produced directly by `short_reads_processing.R` as a 4th output.
+- Columns: `sample`, `AMR_total_cpg` (sum of all gene cpg per sample),
+  `pBI143_cpg`, `crAss001_cpg`.
+- `short_reads_summary` rule now has 4 named outputs; R script accesses via
+  `snakemake@output[[4]]`.
+
+**Contig abundance → CoverM contig:**
+- `contig_abundance` rule converted from Python script (`contig_abundance.py`)
+  to a shell rule using `shortreads.yaml` conda env (already has minimap2,
+  samtools, coverm).
+- Pipeline: `minimap2 -ax sr → samtools sort/index → coverm contig`.
+- CoverM methods: `trimmed_mean mean reads_aligned`. Header cleaned with awk
+  to standard column names: `contig_id`, `trimmed_mean`, `mean_depth`, `reads_mapped`.
+- Removed `scgs` input from `contig_abundance` rule (no longer needed).
+- `contig_summary.py` updated: `parse_abundance()` now reads the three CoverM
+  columns; output schema uses `mean_depth`, `trimmed_mean`, `reads_mapped`
+  instead of `abundance_cpg`.
+- BAM output path unchanged (still reused by MetaBAT2 `bin` rule).
+
+**Removed `amr_unified`:**
+- `amr_unified` rule deleted from `summary.smk`.
+- `AMR_unified.csv` and old `AMR_abundance_summary.csv` targets removed from
+  Snakefile `all_targets()`.
+- `amr_unified.py` and `contig_abundance.py` deleted.
+- `amr_unified` removed from `localrules`.
+
+**Five pipeline outputs:**
+1. `AMR_abundance_summary.csv` — per-sample AMR total cpg + pBI143/crAss001 cpg
+2. `fastp_summary.csv` — per-sample fastp QAQC
+3. `contig_summary.tsv` — AMR+MGE features with CoverM contig abundance
+4. `mag_summary.tsv` — MAG summary (unchanged)
+5. `data/QAQC/short_reads_output.csv` — per-gene short-read AMR data
+
+Both dry-runs pass: production and `--config test=True`.
+
+### Current pipeline state
+- HEAD: `784caee`, pushed to `origin/main`.
+- Test dry-run: 37 jobs (both mock samples, all stages).
+- Production dry-run: 5 local-rule jobs (idempotent from existing outputs).
+
+### Known issues / next steps
+- MGE JSONDecodeError in MobileElementFinder — upstream bug; `|| true` handles
+  gracefully. Awaiting upstream fix.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- Recommend end-to-end test run to validate CoverM contig abundances and
+  reverted cpg values are in plausible ranges.
