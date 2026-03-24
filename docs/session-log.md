@@ -732,3 +732,42 @@ mv dbs/.checkm2.done dbs/checkm2/.done 2>/dev/null || true
 - HPC users with existing `dbs/` need to manually move files into the new subdirectory layout (move commands in session 23 entry).
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - `slurm_account` / `slurm_partition` placeholders need filling before cluster use.
+
+---
+
+## 2026-03-24 (session 24)
+
+### What was done
+
+**Fix: fastp minimum read length to prevent Nonpareil kmer crash**
+
+Running on an independent test dataset exposed a crash in the `short_reads` rule:
+
+```
+Nonpareil ... fatal error: Reads are required to have a minimum length of kmer size...
+```
+
+**Root cause:** `fastp` was called without `--length_required`, so its built-in default
+(15 bp) allowed very short reads (~20 bp) through QC. Nonpareil's kmer mode (`-T kmer`)
+requires every read to be at least as long as the kmer size (default 24 bp). Reads shorter
+than 24 bp caused a fatal crash.
+
+**Fix (`commit TBD`):**
+- `config/config.yaml` — added `min_read_length: 50` under a new "Read QC parameters"
+  section (configurable; 50 bp is the standard practical floor for metagenomic short reads).
+- `workflow/rules/short_reads.smk` — added `min_read_length = config.get("min_read_length", 50)`
+  param to the `short_reads` rule; injected `--length_required {params.min_read_length}` into
+  the `fastp` shell command.
+
+Dry-run validated: both `snakemake -n --scheduler greedy` and
+`snakemake -n --scheduler greedy --config test=True` complete with exit 0.
+
+### Current pipeline state
+- HEAD: this commit, pushed to `origin/main`.
+- Test mode: dry-run DAG valid.
+- fastp now enforces 50 bp minimum read length (configurable via `min_read_length`).
+
+### Known issues / next steps
+- HPC users with existing `dbs/` need to manually move files into the new subdirectory layout (move commands in session 23 entry).
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- `slurm_account` / `slurm_partition` placeholders need filling before cluster use.

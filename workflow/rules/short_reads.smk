@@ -146,7 +146,8 @@ rule short_reads:
         h_genome    = os.path.join(_SR_DBS_DIR, ".h_genome.done"),
         markers_db  = os.path.join(_SR_DBS_DIR, ".markers.done")
     params:
-        h_genome    = os.path.join(_SR_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        h_genome         = os.path.join(_SR_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        min_read_length  = config.get("min_read_length", 50),
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
         r1_clean    = os.path.join(output_dir, "data", "clean_reads", "{sample}_R1.clean.fastq.gz"),
@@ -173,7 +174,7 @@ rule short_reads:
         TMP_R2="$TMPDIR/{wildcards.sample}_R2.fastq.gz"
         
         echo "[{wildcards.sample}] fastp: quality filtering reads..."
-        fastp -i {input.r1} -I {input.r2} -o "$TMP_R1" -O "$TMP_R2" --html /dev/null --json {output.json} >> {log} 2>&1
+        fastp -i {input.r1} -I {input.r2} -o "$TMP_R1" -O "$TMP_R2" --html /dev/null --json {output.json} --length_required {params.min_read_length} >> {log} 2>&1
         echo "[{wildcards.sample}] fastp: done"
 
         echo "[{wildcards.sample}] minimap2: filtering host reads..."

@@ -51,3 +51,13 @@ genomad_splits: 1
 skip_gtdbtk: False
 skip_metabolic: False
 skip_checkm2: False
+
+# -------------------------------------------------------------------
+#  Read QC parameters
+# -------------------------------------------------------------------
+
+# Minimum read length (bp) retained after fastp trimming.
+# Reads shorter than this are discarded before host filtering and alignment.
+# Nonpareil kmer mode requires reads >= 24 bp; 50 bp is the practical floor
+# for meaningful metagenomic assembly and alignment.
+min_read_length: 50
