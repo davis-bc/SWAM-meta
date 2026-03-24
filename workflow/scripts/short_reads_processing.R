@@ -21,6 +21,7 @@ markers_files   <- snakemake@input[["markers_files"]]
 out_file1 <- snakemake@output[[1]]
 out_file2 <- snakemake@output[[2]]
 out_file3 <- snakemake@output[[3]]
+out_file4 <- snakemake@output[[4]]
 
 
 ###############################################
@@ -144,65 +145,34 @@ scg <- do.call(bind_rows, lapply(scgs, function(f) {
 }))
 
 # ---------------------------------------------------------------------------
-# Estimate median single-copy gene (SCG) coverage depth (reads / base).
+# Estimate genome counts from 40 single-copy genes (SCGs).
 #
-# For each of the 40 SCG proteins with ≥1 aligned read:
-#   SCG_depth_i = n_reads_i / (slen_i × 3)          # slen is amino acids → ×3 for nt
+# For each read-SCG alignment:
+#   fraction covered = alignment_length / subject_length
+# n_genomes = Σ(alignment_length / subject_length) / 40
 #
-# CPG = ARG_depth / median_SCG_depth
-#   Both numerator (KMA Depth) and denominator are in reads/base, so the
-#   ratio is dimensionless and directly comparable between the read-based
-#   and assembly-based evidence streams in AMR_unified.
+# CPG = KMA_Depth / n_genomes
 #
-# Reference: Bengtsson-Palme et al. (2017) - median SCG normalisation.
+# Reference: Bengtsson-Palme et al. (2017).
+# Falls back to n_genomes = 1 when no SCG alignments are detected.
 # ---------------------------------------------------------------------------
 if (!is.null(scg) && nrow(scg) > 0 && "sample" %in% colnames(scg)) {
-  scg_norm <- scg %>%
+  genome.counts <- scg %>%
     group_by(sample) %>%
-    distinct(qseqid, .keep_all = TRUE) %>%          # one alignment per read (best hit)
-    group_by(sample, sseqid) %>%
-    summarise(
-      scg_reads   = n(),
-      gene_len_nt = first(slen) * 3L,               # protein aa → nucleotide length
-      .groups = "drop"
-    ) %>%
-    mutate(scg_depth = scg_reads / gene_len_nt) %>% # reads/base per SCG gene
-    group_by(sample) %>%
-    summarise(
-      n_scg_detected   = n(),
-      median_scg_depth = median(scg_depth),
-      .groups = "drop"
-    )
-
-  # Warn for samples with very few detected SCGs (normaliser will be noisy)
-  low_scg <- scg_norm %>% filter(n_scg_detected < 10)
-  if (nrow(low_scg) > 0) {
-    message("WARNING: <10 SCGs detected in sample(s): ",
-            paste(low_scg$sample, "(", low_scg$n_scg_detected, "SCGs)", collapse = ", "),
-            " — CPG estimates may be unreliable.")
-  }
-  message("SCG normalisation: samples=", nrow(scg_norm),
-          "  median SCGs detected=", median(scg_norm$n_scg_detected),
-          "  median SCG depth range=[",
-          round(min(scg_norm$median_scg_depth), 6), ", ",
-          round(max(scg_norm$median_scg_depth), 6), "]")
+    distinct(qseqid, .keep_all = TRUE) %>%   # one alignment per read (best hit)
+    summarise(n_genomes = sum(length / slen) / 40, .groups = "drop")
 } else {
-  # No SCG hits at all — cpg will be NA for all genes
-  message("WARNING: No SCG alignments found. CPG values will be NA.")
-  all_samples <- sub(".scgs", "", basename(scgs))
-  scg_norm <- tibble(sample = all_samples, n_scg_detected = 0L, median_scg_depth = NA_real_)
+  message("WARNING: No SCG alignments found. Falling back to n_genomes = 1.")
+  genome.counts <- tibble(sample = sub(".scgs", "", basename(scgs)), n_genomes = 1)
 }
 
-# estimate copies per genome (cpg):
-#   cpg = KMA_Depth / median_SCG_depth   (both in reads/base → dimensionless)
+# estimate copies per genome (cpg):  cpg = KMA_Depth / n_genomes
 if (!is.null(afp) && nrow(afp) > 0) {
   afp_long <-  afp %>% 
-                    left_join(scg_norm, by="sample") %>% 
+                    left_join(genome.counts, by="sample") %>% 
                     left_join(fastp_summary %>% select(sample, avg_read_length), by="sample") %>%
                     mutate(read_count = round(Depth * Template_length / avg_read_length),
-                           cpg = if_else(!is.na(median_scg_depth) & median_scg_depth > 0,
-                                         Depth / median_scg_depth,
-                                         NA_real_)) %>%
+                           cpg = Depth / n_genomes) %>%
                     filter(read_count >= 1) %>% 
                     left_join(catalog_long, by=c("refseq_nucleotide_accession" = "key")) %>%
                     # Production catalog has allele/gene_family empty for many genes;
@@ -249,11 +219,9 @@ if (!is.null(markers) && nrow(markers) > 0) {
     # KMA includes the full FASTA description after the first space in the template
     # identifier; extract only the accession to allow reliable matching.
     mutate(seq_id = str_extract(template, "^\\S+")) %>%
-    left_join(scg_norm, by = "sample") %>%
+    left_join(genome.counts, by = "sample") %>%
     left_join(fastp_summary %>% select(sample, avg_read_length), by = "sample") %>%
-    mutate(cpg = if_else(!is.na(median_scg_depth) & median_scg_depth > 0,
-                          Depth / median_scg_depth,
-                          NA_real_)) %>%
+    mutate(cpg = Depth / n_genomes) %>%
     select(sample, seq_id, cpg)
 } else {
   marker_cpg <- tibble(sample = character(), seq_id = character(), cpg = double())
@@ -261,8 +229,6 @@ if (!is.null(markers) && nrow(markers) > 0) {
 
 ###############################################
 ###   markers cpg output (pBI143 + crAss001)
-###   AMR_abundance_summary.csv is now produced
-###   by amr_unified.py (uses the unified table)
 ###############################################
 
 pbi143_cpg <- marker_cpg %>%
@@ -282,5 +248,24 @@ markers_out <- tibble(sample = unique(fastp_summary$sample)) %>%
   )
 
 write.csv(markers_out, out_file3, row.names = FALSE)
+
+###############################################
+###   per-sample AMR abundance summary
+###   AMR_total_cpg = sum of all gene cpg values per sample
+###   pBI143_cpg and crAss001_cpg from short reads
+###############################################
+
+amr_total <- afp_long %>%
+  group_by(sample) %>%
+  summarise(AMR_total_cpg = sum(cpg, na.rm = TRUE), .groups = "drop")
+
+amr_abundance_summary <- tibble(sample = unique(fastp_summary$sample)) %>%
+  left_join(amr_total, by = "sample") %>%
+  left_join(markers_out, by = "sample") %>%
+  mutate(
+    AMR_total_cpg = replace_na(AMR_total_cpg, 0)
+  )
+
+write.csv(amr_abundance_summary, out_file4, row.names = FALSE)
 
 

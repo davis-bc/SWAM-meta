@@ -427,7 +427,7 @@ rule mmseqs_taxonomy:
         """
 
 # ---------------------------------------------------------------------------
-#   Per-sample: map clean reads to all contigs; compute cpg abundance
+#   Per-sample: map clean reads to all contigs; compute abundance with CoverM
 # ---------------------------------------------------------------------------
 
 rule contig_abundance:
@@ -435,10 +435,6 @@ rule contig_abundance:
         r1      = get_clean_r1,
         r2      = get_clean_r2,
         contigs = get_contigs,
-        scgs    = lambda wc: (
-            os.path.join(output_dir, "data", "alignments", f"{wc.sample}.scgs")
-            if _RUN_SR else []
-        )
     output:
         bam = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam"),
         bai = os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam.bai"),
@@ -449,9 +445,28 @@ rule contig_abundance:
         threads = lambda wc: res(16, 4),
     log:
         os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.contig_abundance.log")
-    conda: "../envs/contigs.yaml"
-    script:
-        "../scripts/contig_abundance.py"
+    conda: "../envs/shortreads.yaml"
+    shell:
+        """
+        set -euo pipefail
+        mkdir -p $(dirname {output.bam})
+
+        echo "[{wildcards.sample}] minimap2: mapping reads to contigs..."
+        minimap2 -t {resources.threads} -ax sr {input.contigs} {input.r1} {input.r2} 2>> {log} \
+        | samtools sort -@ 4 -o {output.bam} - >> {log} 2>&1
+        samtools index {output.bam} >> {log} 2>&1
+        echo "[{wildcards.sample}] minimap2: done"
+
+        echo "[{wildcards.sample}] CoverM: computing per-contig abundance..."
+        coverm contig \
+            --bam-files {output.bam} \
+            --methods trimmed_mean mean reads_aligned \
+            --min-covered-fraction 0 \
+            --threads {resources.threads} 2>> {log} \
+        | awk 'NR==1{{print "contig_id\ttrimmed_mean\tmean_depth\treads_mapped"}} NR>1{{print}}' \
+        > {output.tsv}
+        echo "[{wildcards.sample}] CoverM: done"
+        """
 
 # ---------------------------------------------------------------------------
 #   Aggregation: join all per-sample annotations into one summary TSV
