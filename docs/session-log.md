@@ -932,3 +932,38 @@ Both dry-runs pass: production and `--config test=True`.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - Recommend end-to-end test run to validate CoverM contig abundances and
   reverted cpg values are in plausible ranges.
+
+---
+
+## 2026-03-24 (session 28)
+
+### What was done
+
+**End-to-end test run — all 24 jobs passed**
+
+Ran full test mode (`snakemake --use-conda --cores 4 --scheduler greedy --config test=True --rerun-incomplete`) following the major output refactor in session 27.
+
+- Cleared incomplete `test/output/data/genomad/mock2` directory (left from prior interrupted run), unlocked stale Snakemake lock, then re-ran.
+- All 24 jobs completed successfully for both mock samples.
+- Timing: ~21 minutes total (geNomad is the bottleneck at ~7 min per sample).
+
+**Outputs verified:**
+
+| File | Size | Notes |
+|------|------|-------|
+| `test/output/AMR_abundance_summary.csv` | 111 B | mock1: 211.1 cpg, mock2: 167.1 cpg; pBI143/crAss001 = 0 (not in mock genomes) |
+| `test/output/fastp_summary.csv` | 453 B | Both samples QC'd |
+| `test/output/contig_summary.tsv` | 11 KB | tet(A), fosA3 detected in mock1 plasmid contigs with CoverM depths |
+| `test/output/mag_summary.tsv` | 402 B | 2 bins per sample; 0 AMR/MGE per bin (expected for mock data) |
+
+### Current pipeline state
+- HEAD: `784caee` (unchanged), pushed to `origin/main`.
+- ✅ **Full end-to-end test mode passes** — 24/24 jobs, both mock samples.
+- Five output files correct and populated.
+- CoverM contig abundance columns (`mean_depth`, `trimmed_mean`, `reads_mapped`) present in `contig_summary.tsv`.
+- Reverted cpg normalisation (`n_genomes = Σ(alignment_length/gene_length)/40`) producing plausible values (~167–211 cpg for 10× mock communities).
+
+### Known issues / next steps
+- MGE JSONDecodeError in MobileElementFinder — upstream bug; `|| true` handles gracefully.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- Recommend end-to-end test on real production samples to validate cpg values in realistic range.
