@@ -214,21 +214,6 @@ for sample in samples:
                 "strand":        feat["strand"],
             })
 
-    # Contigs with no features still get a row (feature columns empty)
-    for cid in sorted(all_contigs):
-        all_rows.append({
-            "sample":        sample,
-            "contig_id":     cid,
-            "abundance_cpg": abund_map.get(cid, ""),
-            "molecule_type": mol_map.get(cid, "chromosome"),
-            "taxonomy":      tax_map.get(cid, ""),
-            "feature_type":  "",
-            "gene":          "",
-            "start":         "",
-            "stop":          "",
-            "strand":        "",
-        })
-
 # ---------------------------------------------------------------------------
 # Write output
 # ---------------------------------------------------------------------------

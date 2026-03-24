@@ -4,12 +4,12 @@
 
 rule initiate_dbs:
     output:
-        afp_db         = os.path.join(_SR_DBS_DIR, ".afp.done"),
-        scg_db         = os.path.join(_SR_DBS_DIR, ".scg.done"),
+        afp_db         = os.path.join(_SR_DBS_DIR, f".afp{_DB_TAG}.done"),
+        scg_db         = os.path.join(_SR_DBS_DIR, f".scg{_DB_TAG}.done"),
         afp_metadata   = os.path.join(_SR_DBS_DIR, "ReferenceGeneCatalog.txt"),
-        h_genome_done  = os.path.join(_SR_DBS_DIR, ".h_genome.done"),
-        markers_db     = os.path.join(_SR_DBS_DIR, ".markers.done"),
-        metabolic_done = os.path.join(_SR_DBS_DIR, ".metabolic.done")
+        h_genome_done  = os.path.join(_SR_DBS_DIR, f".h_genome{_DB_TAG}.done"),
+        markers_db     = os.path.join(_SR_DBS_DIR, f".markers{_DB_TAG}.done"),
+        metabolic_done = os.path.join(_SR_DBS_DIR, f".metabolic{_DB_TAG}.done")
     params:
         dbs_dir          = _SR_DBS_DIR,
         h_genome_path    = os.path.join(_SR_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
@@ -141,10 +141,10 @@ rule short_reads:
     input:
         r1          = get_r1,
         r2          = get_r2,
-        afp_db      = os.path.join(_SR_DBS_DIR, ".afp.done"),
-        scg_db      = os.path.join(_SR_DBS_DIR, ".scg.done"),
-        h_genome    = os.path.join(_SR_DBS_DIR, ".h_genome.done"),
-        markers_db  = os.path.join(_SR_DBS_DIR, ".markers.done")
+        afp_db      = os.path.join(_SR_DBS_DIR, f".afp{_DB_TAG}.done"),
+        scg_db      = os.path.join(_SR_DBS_DIR, f".scg{_DB_TAG}.done"),
+        h_genome    = os.path.join(_SR_DBS_DIR, f".h_genome{_DB_TAG}.done"),
+        markers_db  = os.path.join(_SR_DBS_DIR, f".markers{_DB_TAG}.done")
     params:
         h_genome         = os.path.join(_SR_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
         min_read_length  = config.get("min_read_length", 50),

@@ -9,8 +9,9 @@ import csv
 #   Activated with:  snakemake --config test=True
 # ---------------------------------------------------------------------------
 
-_TEST = config.get("test", False)
-_REPO = os.path.dirname(os.path.dirname(os.path.dirname(workflow.snakefile)))
+_TEST    = config.get("test", False)
+_DB_TAG  = ".test" if _TEST else ""          # isolates test sentinels from production
+_REPO    = os.path.dirname(os.path.dirname(os.path.dirname(workflow.snakefile)))
 
 if _TEST:
     input_dir  = os.path.join(_REPO, "test", "data")
