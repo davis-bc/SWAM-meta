@@ -17,7 +17,7 @@ rule amr_unified:
         contig_summary  = lambda wc: (
             os.path.join(output_dir, "contig_summary.tsv") if _RUN_CTG else []
         ),
-        catalog         = os.path.join(_DBS_DIR, "ReferenceGeneCatalog.txt"),
+        catalog         = os.path.join(_SR_DBS_DIR, "ReferenceGeneCatalog.txt"),
         markers_cpg     = lambda wc: (
             os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv") if _RUN_SR else []
         )
