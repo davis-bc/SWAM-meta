@@ -26,7 +26,7 @@ include: "rules/contigs.smk"
 include: "rules/mags.smk"
 include: "rules/summary.smk"
 
-localrules: initiate_dbs, short_reads_summary, init_genomad, init_amrfinder_db, init_checkm2_db, init_mge_tool, contig_summary, mag_summary
+localrules: initiate_dbs, short_reads_summary, init_genomad, init_amrfinder_db, init_checkm2_db, init_mge_tool, contig_summary, assembly_qa, mag_summary
 
 # ------------------------------------------
 #   Define the target outputs for pipeline
@@ -51,6 +51,7 @@ def all_targets(wildcards):
             *expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples),
             *expand(os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt"), sample=samples),
             os.path.join(output_dir, "contig_summary.tsv"),
+            os.path.join(output_dir, "assembly_qa.tsv"),
         ]
 
     # --- MAG stage ---

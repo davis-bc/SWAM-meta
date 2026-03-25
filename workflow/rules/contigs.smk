@@ -523,6 +523,27 @@ rule contig_summary:
         os.path.join(output_dir, "data", "QAQC", "logs", "contig_summary.log")
     script:
         "../scripts/contig_summary.py"
+
+
+# ---------------------------------------------------------------------------
+#   Aggregation: per-sample assembly QA metrics
+# ---------------------------------------------------------------------------
+
+rule assembly_qa:
+    """Per-sample assembly QA: N50, total length, read mapping stats."""
+    input:
+        bam_files    = expand(os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam"), sample=samples),
+        megahit_logs = expand(os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.megahit.log"), sample=samples)
+    output:
+        tsv = os.path.join(output_dir, "assembly_qa.tsv")
+    params:
+        samples    = samples,
+        output_dir = output_dir
+    conda: "../envs/contigs.yaml"
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "assembly_qa.log")
+    script:
+        "../scripts/assembly_qa.py"
         
         
         
