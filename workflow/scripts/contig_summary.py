@@ -76,8 +76,9 @@ def parse_amr(amr_path):
     """
     Parse AMRFinderPlus output (nucleotide+protein+GFF mode).
 
-    Relevant columns when run with -n/-p/-g:
-      'Contig id', 'Gene symbol', 'Start', 'Stop', 'Strand'
+    Relevant columns when run with -n/-p/-g --plus:
+      'Contig id', 'Gene symbol', 'Type', 'Start', 'Stop', 'Strand'
+    The 'Type' column carries AMR / STRESS / VIRULENCE / ANTIFUNGAL.
     Column names vary slightly across versions; fall back gracefully.
     """
     df = safe_read(amr_path)
@@ -94,6 +95,7 @@ def parse_amr(amr_path):
 
     contig_col = gcol("contig_id", "contig", "sequence_name", "sequence")
     gene_col   = gcol("gene_symbol", "gene", "element_symbol", "name")
+    type_col   = gcol("type")
     start_col  = gcol("start")
     stop_col   = gcol("stop")
     strand_col = gcol("strand")
@@ -112,9 +114,11 @@ def parse_amr(amr_path):
                 prot_id = str(row[prot_col])
                 cid = prot_id.rsplit("_", 1)[0]
 
+        feature_type = str(row[type_col]).strip() if type_col else "AMR"
+
         features.append({
             "contig_id":    cid,
-            "feature_type": "AMR",
+            "feature_type": feature_type,
             "gene":         str(row[gene_col])   if gene_col   else "",
             "start":        str(row[start_col])  if start_col  else "",
             "stop":         str(row[stop_col])   if stop_col   else "",

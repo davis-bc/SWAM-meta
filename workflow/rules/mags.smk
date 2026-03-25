@@ -184,6 +184,7 @@ rule mag_amr:
                 -g "$gff" \
                 --database {params.afp_db_dir} \
                 --threads {resources.threads} \
+                --plus \
                 --annotation_format prodigal \
                 -o "$TMP_AMR.bin" >> {log} 2>&1 || true
             if [ -s "$TMP_AMR.bin" ]; then

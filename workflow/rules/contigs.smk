@@ -322,6 +322,7 @@ rule contig_amr:
             -g {input.gff} \
             --database {params.afp_db_dir} \
             --threads {resources.threads} \
+            --plus \
             -o {output.tsv} \
             --annotation_format prodigal >> {log} 2>&1 || true
         # Create empty file if no hits found or database not yet set up
