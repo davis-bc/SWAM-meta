@@ -5,11 +5,11 @@ Snakemake script (called via script: directive).
 
 Aggregates per-sample contig-level annotations into one long-format TSV:
 
-    sample | contig_id | mean_depth | trimmed_mean | reads_mapped |
+    sample | contig_id | trimmed_mean |
     molecule_type | taxonomy | feature_type | gene | start | stop | strand
 
 One row per annotated feature (AMR gene or MGE). Contig abundance comes from
-CoverM contig mode (trimmed_mean, mean, reads_aligned).
+CoverM contig mode (trimmed_mean only).
 """
 
 import os
@@ -61,18 +61,14 @@ def parse_lca(lca_path):
 
 
 def parse_abundance(abund_path):
-    """Return dict {contig_id -> {trimmed_mean, mean_depth, reads_mapped}} from CoverM contig output."""
+    """Return dict {contig_id -> trimmed_mean} from CoverM contig output."""
     df = safe_read(abund_path)
     if df.empty or "contig_id" not in df.columns:
         return {}
     result = {}
     for _, row in df.iterrows():
         cid = str(row["contig_id"])
-        result[cid] = {
-            "trimmed_mean": row.get("trimmed_mean", ""),
-            "mean_depth":   row.get("mean_depth",   ""),
-            "reads_mapped": row.get("reads_mapped",  ""),
-        }
+        result[cid] = row.get("trimmed_mean", "")
     return result
 
 
@@ -209,13 +205,11 @@ for sample in samples:
         for feat in features:
             cid = feat["contig_id"]
             all_contigs.discard(cid)  # will be covered below
-            abund = abund_map.get(cid, {})
+            abund = abund_map.get(cid, "")
             all_rows.append({
                 "sample":        sample,
                 "contig_id":     cid,
-                "mean_depth":    abund.get("mean_depth",   ""),
-                "trimmed_mean":  abund.get("trimmed_mean", ""),
-                "reads_mapped":  abund.get("reads_mapped", ""),
+                "trimmed_mean":  abund,
                 "molecule_type": mol_map.get(cid, "chromosome"),
                 "taxonomy":      tax_map.get(cid, ""),
                 "feature_type":  feat["feature_type"],
@@ -228,7 +222,7 @@ for sample in samples:
 # ---------------------------------------------------------------------------
 # Write output
 # ---------------------------------------------------------------------------
-COLS = ["sample", "contig_id", "mean_depth", "trimmed_mean", "reads_mapped",
+COLS = ["sample", "contig_id", "trimmed_mean",
         "molecule_type", "taxonomy", "feature_type", "gene", "start", "stop", "strand"]
 
 out_df = pd.DataFrame(all_rows, columns=COLS) if all_rows else pd.DataFrame(columns=COLS)

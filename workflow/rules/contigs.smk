@@ -368,16 +368,47 @@ rule mge_annotation:
     shell:
         """
         mkdir -p {output.tmp}
-        PREFIX=$(dirname {output.tsv})/{wildcards.sample}_mge
+        CHUNK_DIR={output.tmp}/chunks
+        mkdir -p "$CHUNK_DIR"
+
+        # Split assembly into chunks of ≤200 contigs.
+        # Workaround for MEF ≥1.1 JSONDecodeError: blastn -outfmt 15 writes
+        # multiple concatenated JSON objects for large inputs; json.load() fails.
+        echo "[{wildcards.sample}] MobileElementFinder: splitting contigs into chunks..."
+        awk -v CHUNK="$CHUNK_DIR" \
+            'BEGIN{{n=0;c=0}} \
+             /^>/{{c++;if(c==1||c%200==1){{n++;close(f);f=CHUNK"/"n".fa"}} print > f;next}} \
+             {{print > f}}' \
+            {input.contigs}
+
+        TMP_CSV={output.tmp}/combined.csv
+        HEADER_WRITTEN=0
         echo "[{wildcards.sample}] MobileElementFinder: annotating MGEs..."
-        mefinder find \
-            --contig {input.contigs} \
-            --temp-dir {output.tmp} \
-            --threads {resources.threads} \
-            "$PREFIX" >> {log} 2>&1 || true
-        # mefinder writes PREFIX.csv; rename to expected .tsv
-        if [ -f "${{PREFIX}}.csv" ]; then
-            mv "${{PREFIX}}.csv" {output.tsv}
+        for chunk in "$CHUNK_DIR"/*.fa; do
+            [ -f "$chunk" ] || continue
+            base=$(basename "$chunk" .fa)
+            CHUNK_PREFIX={output.tmp}/$base
+            CHUNK_TMP={output.tmp}/tmp_$base
+            mkdir -p "$CHUNK_TMP"
+            mefinder find \
+                --contig "$chunk" \
+                --temp-dir "$CHUNK_TMP" \
+                --threads {resources.threads} \
+                "$CHUNK_PREFIX" >> {log} 2>&1 || true
+            csv="${{CHUNK_PREFIX}}.csv"
+            if [ -s "$csv" ]; then
+                if [ $HEADER_WRITTEN -eq 0 ]; then
+                    cat "$csv" > "$TMP_CSV"
+                    HEADER_WRITTEN=1
+                else
+                    # Append only data rows (skip comment + header lines)
+                    grep -v "^#" "$csv" | tail -n +2 >> "$TMP_CSV"
+                fi
+            fi
+        done
+
+        if [ -f "$TMP_CSV" ] && [ -s "$TMP_CSV" ]; then
+            mv "$TMP_CSV" {output.tsv}
         else
             touch {output.tsv}
         fi
@@ -463,7 +494,7 @@ rule contig_abundance:
             --methods trimmed_mean \
             --min-covered-fraction 0 \
             --threads {resources.threads} 2>> {log} \
-        | awk 'NR==1{{print "contig_id\ttrimmed_mean\tmean_depth\treads_mapped"}} NR>1{{print}}' \
+        | awk 'NR==1{{print "contig_id\ttrimmed_mean"}} NR>1{{print}}' \
         > {output.tsv}
         echo "[{wildcards.sample}] CoverM: done"
         """
