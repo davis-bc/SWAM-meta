@@ -345,7 +345,7 @@ rule init_mge_tool:
         mkdir -p $(dirname {output.done})
         echo "MobileElementFinder: installing..."
         pip install --no-deps --quiet mypy-extensions >> {log} 2>&1
-        pip install --no-deps --quiet MGEdb==1.1.2 >> {log} 2>&1
+        pip install --no-deps --quiet MGEdb==1.1.1 >> {log} 2>&1
         pip install --no-deps --quiet MobileElementFinder >> {log} 2>&1
         touch {output.done}
         echo "MobileElementFinder: installed"
@@ -460,7 +460,7 @@ rule contig_abundance:
         echo "[{wildcards.sample}] CoverM: computing per-contig abundance..."
         coverm contig \
             --bam-files {output.bam} \
-            --methods trimmed_mean mean reads_aligned \
+            --methods trimmed_mean \
             --min-covered-fraction 0 \
             --threads {resources.threads} 2>> {log} \
         | awk 'NR==1{{print "contig_id\ttrimmed_mean\tmean_depth\treads_mapped"}} NR>1{{print}}' \
