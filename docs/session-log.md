@@ -1013,3 +1013,32 @@ The awk header rename was incorrect (4-column header on 2-column data). Fixed:
 ### Known issues / next steps
 - Recommend end-to-end test (`--config test=True`) to confirm MEF chunking works on mock2.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+
+---
+
+## 2026-03-25 (session 30)
+
+### What was done
+
+**End-to-end test run — all 15 jobs passed**
+
+Ran full test mode (`snakemake --use-conda --cores 4 --scheduler greedy --config test=True --rerun-incomplete`)
+to validate the session 29 fixes (MEF chunking + trimmed_mean headers).
+
+**Results:**
+
+| File | Notes |
+|------|-------|
+| `contig_abundance` headers | `contig_id\ttrimmed_mean` — 2 columns correct, both samples |
+| `contig_summary.tsv` headers | `sample contig_id trimmed_mean molecule_type taxonomy ...` |
+| `mock2_mge.tsv` | **49 lines** — MEF chunking fix works; was empty (0 B) before |
+| `mock1_mge.tsv` | 40 lines — unchanged |
+
+mock2 now produces 43 MGE feature rows in `contig_summary.tsv`; previously the
+JSONDecodeError caused mock2 to produce zero MGE annotations.
+
+### Current pipeline state
+- HEAD: `73b1b70` (session 29 fixes), pushed to `origin/main`.
+- ✅ **Full end-to-end test mode passes** — 15/15 jobs, both mock samples.
+- MEF chunking (≤200 contigs/batch) confirmed working for large contig sets.
+- `contig_summary.tsv` schema correct: trimmed_mean only.
