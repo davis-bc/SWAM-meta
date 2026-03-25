@@ -967,3 +967,49 @@ Ran full test mode (`snakemake --use-conda --cores 4 --scheduler greedy --config
 - MGE JSONDecodeError in MobileElementFinder — upstream bug; `|| true` handles gracefully.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - Recommend end-to-end test on real production samples to validate cpg values in realistic range.
+
+---
+
+## 2026-03-25 (session 29)
+
+### What was done
+
+**MobileElementFinder status investigation + fixes (`06bb1f2`)**
+
+**MobileElementFinder status:**
+Version 1.1.2 (latest) has an upstream `JSONDecodeError` bug in `me_finder/tools/blast.py`:
+`blastn -outfmt 15` (JSON output) writes multiple concatenated JSON objects when processing
+many query sequences; `json.load()` stops after the first and raises `Extra data`. The bug
+exists in all 1.1.x versions (introduced when JSON replaced XML for BLAST output). Rolling
+back to 1.0.x would likely fix the root cause but risks CLI incompatibility. Status:
+- **mock1** (fewer contigs): works ✅
+- **mock2** (many contigs): JSONDecodeError → empty TSV, handled by `|| true`
+
+**Fix: contig chunking in `mge_annotation` rule**
+
+Replaced the single `mefinder find` call with a chunk-based loop:
+1. Split assembly FASTA into batches of ≤200 contigs using `awk`
+2. Run `mefinder find` per chunk (small BLAST JSON → no parse error)
+3. Concatenate CSV results (comment/header from first hit chunk; data rows from rest)
+4. Move combined CSV to output TSV (or `touch` if no hits)
+
+This is version-agnostic and handles the upstream bug without patching installed packages.
+The `mag_mge` rule is unchanged — it already runs mefinder per-bin and bins are small.
+
+**Fix: contig summary — trimmed_mean only**
+
+CoverM `contig_abundance` rule already calls `--methods trimmed_mean` (2-column output).
+The awk header rename was incorrect (4-column header on 2-column data). Fixed:
+- `contigs.smk` `contig_abundance`: awk header → `"contig_id\ttrimmed_mean"`
+- `contig_summary.py`: `parse_abundance()` returns scalar trimmed_mean; `all_rows` and
+  `COLS` drop `mean_depth` and `reads_mapped`; docstring updated.
+
+### Current pipeline state
+- HEAD: `06bb1f2`, pushed to `origin/main`.
+- Dry-run: 17 jobs (both mock samples, all stages) — passes cleanly.
+- `contig_summary.tsv` schema: `sample | contig_id | trimmed_mean | molecule_type | taxonomy | feature_type | gene | start | stop | strand`
+- MobileElementFinder chunking active; mock2 MGE annotations should now be captured.
+
+### Known issues / next steps
+- Recommend end-to-end test (`--config test=True`) to confirm MEF chunking works on mock2.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
