@@ -1042,3 +1042,30 @@ JSONDecodeError caused mock2 to produce zero MGE annotations.
 - ✅ **Full end-to-end test mode passes** — 15/15 jobs, both mock samples.
 - MEF chunking (≤200 contigs/batch) confirmed working for large contig sets.
 - `contig_summary.tsv` schema correct: trimmed_mean only.
+
+---
+
+## Session 31 — 2026-03-24
+
+### Work done
+- **`assembly_qa.tsv`** — new pipeline output (one row per sample), parallel to `fastp_summary.csv`
+  - Metrics from MEGAHIT log: `n_contigs`, `total_length_bp`, `n50_bp`, `longest_contig_bp`, `shortest_contig_bp`, `mean_contig_length_bp`
+  - Metrics from samtools flagstat on existing BAM: `reads_total`, `reads_mapped`, `pct_reads_mapped`
+  - New script: `workflow/scripts/assembly_qa.py` (regex-parses MEGAHIT summary line; subprocess flagstat)
+  - New `assembly_qa` localrule in `contigs.smk` using `contigs.yaml` env (has both samtools + pandas)
+  - Added to `localrules` and `all_targets()` in `Snakefile`
+  - Fixed conda env: initial draft used `shortreads.yaml` (no pandas) → changed to `contigs.yaml`
+  - Test output verified: mock1 (331 contigs, 8.28 Mbp, N50=67.7 kb, 99.3% reads mapped), mock2 (486 contigs, 11.6 Mbp, N50=52.8 kb, 99.5% reads mapped)
+- **Commit**: `e3b8da4`
+
+### Current state
+All 31 jobs pass end-to-end in test mode. Key outputs:
+- `fastp_summary.csv` — read QC per sample
+- `short_reads_output.csv`, `markers_cpg.csv` — short-read AMR + marker cpg
+- `assembly_qa.tsv` — per-sample assembly QA metrics (**new this session**)
+- `contig_summary.tsv` — per-contig annotations (trimmed_mean, molecule_type, taxonomy, feature_type, gene)
+- `AMR_unified.csv`, `AMR_abundance_summary.csv` — cross-stage AMR
+- `mag_summary.tsv` — MAG-level annotations
+
+### Known issues / next steps
+- None outstanding
