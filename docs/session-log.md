@@ -1069,3 +1069,35 @@ All 31 jobs pass end-to-end in test mode. Key outputs:
 
 ### Known issues / next steps
 - None outstanding
+
+---
+
+## 2026-04-10 (session 27)
+
+### What was done
+
+#### Anthropogenic marker injection into test data
+- Created `test/scripts/inject_marker_reads.py`: simulates 200 paired-end reads (150 bp, seed=99) from pBI143 and 500 from crAss001, appended to both mock1 and mock2 FASTQs
+- pBI143 (Bacteroides fragilis plasmid, 2,747 bp) at ~10x coverage; crAss001 (102,679 bp) at ~1x
+- Expected: pBI143_cpg >= 1.0, crAss001_cpg ~0.3-1.5 after SCG normalisation -> E_exposure = 1.00 / 0.75 for test samples
+- Updated `test/data/mock_data_summary.txt` and `test/scripts/generate_mock_data.py` to document injection step
+
+#### AMR Risk Scoring Module
+- Implemented **Strategy 1 (Additive)** and **Strategy 2 (Multiplicative)** from `unified_amr_risk_score_strategies.txt`
+- Four components (all 0-1):
+  - **R** (Resistance Hazard): WHO criticality tiers from AMRFinderPlus subclass/class (0.40-1.00)
+  - **M** (Mobility): molecule_type + MGE co-location from contig_summary.tsv; short_reads_only = 0.10
+  - **H** (Host/Pathogenicity): ESKAPE/Enterobacteriaceae/human-assoc/environmental from MMseqs2 taxonomy (0.15-1.00)
+  - **E** (Exposure): sample-level from markers_cpg.csv thresholds (0.10-1.00)
+- New file: `workflow/scripts/amr_risk_score.py`
+- New rule: `amr_risk_score` localrule in `workflow/rules/summary.smk`; added to `localrules` in `Snakefile`
+- Removed `AMR_abundance_summary.csv` production from `short_reads_processing.R` (was out_file4); rule output also removed from `short_reads_summary` in `short_reads.smk`
+- Output columns: `sample, AMR_total_cpg, pBI143_cpg, crAss001_cpg, E_exposure, R_mean, M_mean, H_mean, amr_risk_additive_raw, amr_risk_multiplicative_raw, amr_risk_additive, amr_risk_multiplicative`
+
+### Pipeline state
+- Dry-run confirmed: 39 jobs in test mode (up from 37), DAG valid
+- Full end-to-end test run NOT yet done this session
+
+### Known issues / next steps
+- Run full test to verify E_exposure > 0.10 for both mock samples after marker injection
+- `AMR_unified.csv` referenced in earlier session logs no longer exists; `AMR_abundance_summary.csv` is the authoritative per-sample AMR table

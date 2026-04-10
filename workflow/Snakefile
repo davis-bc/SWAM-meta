@@ -26,7 +26,7 @@ include: "rules/contigs.smk"
 include: "rules/mags.smk"
 include: "rules/summary.smk"
 
-localrules: initiate_dbs, short_reads_summary, init_genomad, init_amrfinder_db, init_checkm2_db, init_mge_tool, contig_summary, assembly_qa, mag_summary
+localrules: initiate_dbs, short_reads_summary, init_genomad, init_amrfinder_db, init_checkm2_db, init_mge_tool, contig_summary, assembly_qa, amr_risk_score, mag_summary
 
 # ------------------------------------------
 #   Define the target outputs for pipeline

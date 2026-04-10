@@ -229,8 +229,7 @@ rule short_reads_summary:
     output:
         fastp            = os.path.join(output_dir, "fastp_summary.csv"),
         afp              = os.path.join(output_dir, "data", "QAQC", "short_reads_output.csv"),
-        markers_cpg      = os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv"),
-        amr_abund_summary = os.path.join(output_dir, "AMR_abundance_summary.csv")
+        markers_cpg      = os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv")
     conda: "../envs/Renv.yaml"
     log:
         os.path.join(output_dir, "data", "QAQC", "logs", "short_reads_summary.log")

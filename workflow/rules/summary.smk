@@ -9,6 +9,31 @@
 #   One row per (sample, bin).
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+#   AMR risk score table
+#   Computes additive and multiplicative AMR risk scores per sample.
+#   Sources: short_reads_output.csv (gene cpg + class/subclass),
+#            markers_cpg.csv (pBI143 / crAss001 — Exposure component),
+#            contig_summary.tsv (mobility + host taxonomy; optional).
+#   Produces AMR_abundance_summary.csv with per-sample risk columns.
+# ---------------------------------------------------------------------------
+
+rule amr_risk_score:
+    input:
+        short_reads    = os.path.join(output_dir, "data", "QAQC", "short_reads_output.csv"),
+        markers_cpg    = os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv"),
+        contig_summary = ([os.path.join(output_dir, "contig_summary.tsv")] if _RUN_CTG else []),
+    output:
+        os.path.join(output_dir, "AMR_abundance_summary.csv")
+    params:
+        samples = samples,
+    conda: "../envs/contigs.yaml"
+    log:
+        os.path.join(output_dir, "data", "QAQC", "logs", "amr_risk_score.log")
+    script:
+        "../scripts/amr_risk_score.py"
+
+
 rule mag_summary:
     input:
         amr_files   = expand(

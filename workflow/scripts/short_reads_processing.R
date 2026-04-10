@@ -21,7 +21,6 @@ markers_files   <- snakemake@input[["markers_files"]]
 out_file1 <- snakemake@output[[1]]
 out_file2 <- snakemake@output[[2]]
 out_file3 <- snakemake@output[[3]]
-out_file4 <- snakemake@output[[4]]
 
 
 ###############################################
@@ -248,24 +247,3 @@ markers_out <- tibble(sample = unique(fastp_summary$sample)) %>%
   )
 
 write.csv(markers_out, out_file3, row.names = FALSE)
-
-###############################################
-###   per-sample AMR abundance summary
-###   AMR_total_cpg = sum of all gene cpg values per sample
-###   pBI143_cpg and crAss001_cpg from short reads
-###############################################
-
-amr_total <- afp_long %>%
-  group_by(sample) %>%
-  summarise(AMR_total_cpg = sum(cpg, na.rm = TRUE), .groups = "drop")
-
-amr_abundance_summary <- tibble(sample = unique(fastp_summary$sample)) %>%
-  left_join(amr_total, by = "sample") %>%
-  left_join(markers_out, by = "sample") %>%
-  mutate(
-    AMR_total_cpg = replace_na(AMR_total_cpg, 0)
-  )
-
-write.csv(amr_abundance_summary, out_file4, row.names = FALSE)
-
-

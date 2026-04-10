@@ -90,3 +90,11 @@ Files generated
   test/dbs/genomes/carjivirus.fa
   test/dbs/genomes/influenza.fa
   test/data/mock_data_summary.txt     (this file)
+
+Anthropogenic marker reads (injected)
+--------------------------------------
+  200 read pairs from pBI143 (U30316.1, Bacteroides fragilis plasmid, 2,747 bp)
+  500 read pairs from crAss001 (NC_049977.1, Bacteroides phage crAss001, 102,679 bp)
+  injected into both mock1 and mock2 using test/scripts/inject_marker_reads.py (seed=99)
+  Expected KMA output: pBI143 depth ~10x, crAss001 depth ~1x → non-zero cpg after SCG normalisation
+  Purpose: exercises the Exposure (E) component of the AMR risk scoring module

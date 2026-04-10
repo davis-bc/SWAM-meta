@@ -617,6 +617,11 @@ def main():
     print("  FASTQs:      test/data/")
     print("  Ref FASTAs:  test/dbs/genomes/")
     print("  Summary:     test/data/mock_data_summary.txt")
+    print()
+    print("NOTE: After running this script, also run:")
+    print("  python test/scripts/inject_marker_reads.py")
+    print("to append pBI143 and crAss001 reads to the test FASTQs.")
+    print("This is required for the AMR risk scoring module (Exposure component).")
     print("=" * 60)
 
 
