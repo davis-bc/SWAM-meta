@@ -40,7 +40,8 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 short_reads_csv  = snakemake.input.get("short_reads",   None)
-contig_tsv       = snakemake.input.get("contig_summary", None)
+_ctg             = snakemake.input.get("contig_summary", [])
+contig_tsv       = str(_ctg[0]) if _ctg else None
 markers_csv      = snakemake.input.get("markers_cpg",   None)
 out_file         = snakemake.output[0]
 samples          = snakemake.params.samples
