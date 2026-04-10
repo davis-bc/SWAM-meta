@@ -1101,3 +1101,54 @@ All 31 jobs pass end-to-end in test mode. Key outputs:
 ### Known issues / next steps
 - Run full test to verify E_exposure > 0.10 for both mock samples after marker injection
 - `AMR_unified.csv` referenced in earlier session logs no longer exists; `AMR_abundance_summary.csv` is the authoritative per-sample AMR table
+
+---
+
+## 2026-04-10 (session 32)
+
+### What was done
+
+**End-to-end test run — all 11 remaining jobs passed** (resuming from session 27 pipe break)
+
+Short-reads analysis and MAG stages were already complete from prior runs. Resumed from
+the geNomad/contig stage forward with `--rerun-incomplete`.
+
+**Bug fixed: `amr_risk_score` — Namedlist TypeError (`6e81cae`)**
+
+`snakemake.input.get("contig_summary", None)` returned a Snakemake `Namedlist` instead of
+a string because `contig_summary` is defined as a conditional list in the rule
+(`[path] if _RUN_CTG else []`). Fixed by extracting the first element explicitly:
+
+```python
+_ctg       = snakemake.input.get("contig_summary", [])
+contig_tsv = str(_ctg[0]) if _ctg else None
+```
+
+**Outputs verified:**
+
+| File | Notes |
+|------|-------|
+| `AMR_abundance_summary.csv` | Risk scores generated for both mock samples |
+| `contig_summary.tsv` | 214 rows (AMR + MGE features, both samples) |
+
+**Risk score spot-check:**
+
+| Sample | pBI143_cpg | crAss001_cpg | E_exposure | R_mean | M_mean | H_mean | Additive (norm) |
+|--------|-----------|-------------|-----------|--------|--------|--------|----------------|
+| mock1 | 3.64 | 0.24 | 1.0 | 0.752 | 0.836 | 0.181 | 100.0 |
+| mock2 | 3.57 | 0.24 | 1.0 | 0.703 | 0.766 | 0.185 | 0.0 |
+
+E_exposure = 1.0 for both samples confirms marker injection (pBI143 + crAss001) works.
+Normalised scores are min-max across samples — with only 2 samples, one is always 0 and
+one is 100 (expected behaviour; will spread meaningfully with more production samples).
+
+### Current pipeline state
+- HEAD: `6e81cae`, pushed to origin/main.
+- Full end-to-end test mode passes — all jobs, both mock samples.
+- AMR risk scoring module (additive + multiplicative, 4-component R x M x H x E) confirmed working.
+- `AMR_abundance_summary.csv` schema: `sample, AMR_total_cpg, pBI143_cpg, crAss001_cpg, E_exposure, R_mean, M_mean, H_mean, amr_risk_additive_raw, amr_risk_multiplicative_raw, amr_risk_additive, amr_risk_multiplicative`
+
+### Known issues / next steps
+- Normalised risk scores with only 2 test samples are always 0/100 — not a bug, expected with min-max when n=2.
+- `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
+- Consider end-to-end test on real production samples to validate risk scores in a realistic multi-sample cohort.
