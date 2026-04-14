@@ -2,20 +2,26 @@
 
 Snakemake workflow for end-to-end metagenomic analysis of antibiotic resistance in environmental bacterial communities.
 
-## Overview
+## What it produces
 
-SWAM-meta takes paired-end FASTQ files and produces a fully normalised, multi-evidence AMR abundance table alongside per-contig and per-MAG annotation outputs:
+SWAM-meta starts from paired-end FASTQs and generates:
 
-- **Short-read summaries** — AMR gene abundance (copies per genome, cpg) via KMA alignment against AMRFinderPlus, metagenomic coverage (Nonpareil), and QC metrics (fastp)
-- **Assembled contigs** — de novo assembly, contig classification (chromosome / plasmid / phage), plasmid system inference (MobMess), taxonomy (MMseqs2/UniRef50), AMR (AMRFinderPlus), and MGE (MobileElementFinder) annotations joined into one TSV
-- **Unified AMR table** — blends short-read sensitivity with contig-level context; cpg-normalised; evidence column tracks detection source
-- **Metagenome-Assembled Genomes (MAGs)** — binning, AMR/MGE annotation, taxonomy (GTDB-tk, optional), metabolic potential (METABOLIC, optional), quality (CheckM2, optional), and relative abundance per MAG
+- **`fastp_summary.csv`** - per-sample read QC and Nonpareil coverage
+- **`assembly_qa.tsv`** - per-sample assembly size, N50, and read-mapping stats
+- **`contig_summary.tsv`** - per-contig abundance, taxonomy, AMR, MGE, and molecule type
+- **`AMR_abundance_summary.csv`** - per-sample AMR abundance plus additive and multiplicative risk scores
+- **`mag_summary.tsv`** - per-MAG abundance and annotations
+
+It also keeps lower-level outputs under `out_dir/data/`, including assemblies, geNomad results, MobMess output, MAG files, and the short-read tables `data/QAQC/short_reads_output.csv` and `data/QAQC/markers_cpg.csv`.
 
 ---
 
-## Pipeline stages
+## Pipeline at a glance
 
-The rule dependency graph below is generated directly from `workflow/Snakefile`, so it reflects the current Snakemake DAG rather than a manually maintained stage list. It includes the optional MAG taxonomy, metabolism, and quality-control branches when those stages are enabled.
+1. **Short reads** - fastp QC, host filtering, KMA AMR alignment, SCG alignment, anthropogenic marker alignment, Nonpareil
+2. **Contigs** - MEGAHIT assembly, geNomad classification, MobMess, Prodigal, AMRFinderPlus, MobileElementFinder, MMseqs2 taxonomy, contig abundance
+3. **MAGs** - MetaBAT2 binning, per-bin AMR/MGE annotation, abundance, and optional GTDB-tk, CheckM2, and METABOLIC
+4. **Summary** - sample-level AMR abundance and risk scoring from AMR, mobility, host context, and marker-derived exposure
 
 [![SWAM-meta rulegraph](docs/rulegraph.png)](docs/rulegraph.png)
 
@@ -26,253 +32,198 @@ The rule dependency graph below is generated directly from `workflow/Snakefile`,
 ```bash
 git clone https://github.com/<org>/SWAM-meta.git
 cd SWAM-meta
-```
-
-Install Snakemake and the SLURM executor plugin into your base conda environment:
-
-```bash
 conda install -c conda-forge -c bioconda "snakemake>=8" snakemake-executor-plugin-slurm
 ```
 
-> **Always use `--scheduler greedy`** when running Snakemake. The default MILP scheduler requires the `cbc` solver which is not installed.
+All workflow tools are installed automatically into per-rule conda environments on first run with `--use-conda`.
 
-All workflow tools are installed automatically into isolated conda environments on first run via `--use-conda`.
+> **Always use `--scheduler greedy`.** The default MILP scheduler requires the `cbc` solver, which is not installed.
 
 ---
 
-## Quick start: test mode
+## Quick start
 
-Test mode runs the full pipeline on two synthetic mock samples using pre-built mini databases. It requires ≤ 16 GB RAM and ≤ 4 cores. No configuration changes are needed.
+### Test mode
+
+This runs the full workflow on two bundled mock samples and mini databases.
 
 ```bash
-# 1. Dry run — validate the DAG without executing any jobs
 snakemake -n --use-conda --cores 4 --scheduler greedy --config test=True
-
-# 2. Full end-to-end test run
-snakemake --use-conda --cores 4 --scheduler greedy --config test=True
+snakemake    --use-conda --cores 4 --scheduler greedy --config test=True
 ```
 
-Expected runtime: ~30–60 minutes on a laptop. Outputs are written to `test/output/`.
+Expected runtime is about 30-60 minutes on a laptop. Outputs go to `test/output/`.
+
+### Production mode
+
+Edit `config/config.yaml`:
+
+```yaml
+in_dir:  /path/to/fastq_files
+out_dir: /path/to/output
+```
+
+Then run:
+
+```bash
+snakemake -n --use-conda --scheduler greedy
+snakemake    --use-conda --cores <N> --scheduler greedy
+```
+
+To resume after a failed run:
+
+```bash
+snakemake --use-conda --cores <N> --scheduler greedy --rerun-incomplete
+```
 
 ---
 
-## Production setup
+## Databases
 
-### 1. Configure `config/config.yaml`
+Most databases are downloaded and prepared automatically in `dbs/` on first use, including:
 
-Only two paths are required. Open `config/config.yaml` and set:
+- AMRFinderPlus databases
+- human reference for host filtering
+- anthropogenic markers (`pBI143`, `crAss001`)
+- geNomad database
+- UniRef50 MMseqs2 taxonomy database
+- CheckM2 database
+- METABOLIC
 
-```yaml
-in_dir:  /path/to/fastq_files   # paired-end FASTQs (*R1*.fastq* or *_1.fastq*)
-out_dir: /path/to/output        # per-dataset analysis output directory
-```
-
-All databases (AMRFinderPlus, human reference genome, anthropogenic markers, UniRef50 MMseqs2, CheckM2, METABOLIC) are **downloaded and built automatically** by SWAM-meta into `SWAM-meta/dbs/` on first run. This directory is gitignored and shared across all datasets. The 40 single-copy gene (SCG) FASTA used for cpg normalisation ships with the repository at `workflow/resources/SCGs_40_All.fasta` — no manual setup required.
-
-**Optional databases** — downloaded only when the corresponding stage is enabled:
-
-| Database | Triggered by | Size | Notes |
-|----------|-------------|------|-------|
-| AMRFinderPlus KMA index + human genome | first run | ~1.2 GB | always downloaded; stored in `dbs/short_reads/` |
-| Anthropogenic markers (pBI143, crAss001) | first run | < 1 MB | auto-fetched from NCBI; stored in `dbs/short_reads/` |
-| AMRFinderPlus protein DB | first run | ~600 MB | stored in `dbs/amrfinderplus_db/` |
-| geNomad DB | first run | ~3 GB | stored in `dbs/genomad_db/` |
-| UniRef50 MMseqs2 taxonomy DB | first `init_mmseqs_db` | ~75 GB | 4–8 h build time; stored in `dbs/uniref50/` |
-| CheckM2 reference DB | first run with `skip_checkm2: False` | ~3 GB | stored in `dbs/checkm2/` |
-| METABOLIC | first run with `skip_metabolic: False` | ~500 MB | git-cloned |
-
-**GTDB-tk** is the only database that must be set up manually (it has no automated installer):
+**GTDB-tk is the only manual setup step.**
 
 ```bash
 conda run -n gtdbtk download-db.sh /path/to/gtdbtk_db
-# then set  gtdbtk_db: /path/to/gtdbtk_db  in config/config.yaml
 ```
 
-To skip optional stages entirely, set in `config/config.yaml`:
+Then set:
 
 ```yaml
-skip_gtdbtk:   True
-skip_metabolic: True
-skip_checkm2:  True
+gtdbtk_db: /path/to/gtdbtk_db
 ```
 
-Optional tuning:
+Optional stages can be disabled in `config/config.yaml`:
 
 ```yaml
-genomad_splits: 1     # increase (e.g. 4–8) to reduce geNomad peak memory
+skip_gtdbtk: False
+skip_metabolic: False
+skip_checkm2: False
+genomad_splits: 1
 ```
 
-### 2. Run the workflow
-
-```bash
-# Dry run (validate DAG + config)
-snakemake -n --use-conda --scheduler greedy
-
-# Local run
-snakemake --use-conda --cores <N> --scheduler greedy
-
-# Resume after failure
-snakemake --use-conda --cores <N> --scheduler greedy --rerun-incomplete
-
-# Force re-run a specific rule
-snakemake --use-conda --cores <N> --scheduler greedy --forcerun <rule_name>
-```
-
-The first run downloads and indexes the AMRFinderPlus KMA database (~300 MB), the AMRFinderPlus protein database (~600 MB), and the human reference genome (~900 MB) automatically into `dbs/short_reads/` and `dbs/amrfinderplus_db/`.
+Increase `genomad_splits` if geNomad needs less peak memory.
 
 ---
 
-### 3. Running on SLURM
+## Running on SLURM
 
-SWAM-meta includes two SLURM profiles using [snakemake-executor-plugin-slurm](https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html):
+Two profiles are included:
 
-| Profile | Use when |
-|---------|----------|
-| `config/slurm/small-batch` | < 50 samples — each rule runs as its own job |
-| `config/slurm/large-batch` | ≥ 50 samples — lightweight annotation rules are batched across samples |
+| Profile | Best for |
+|---|---|
+| `config/slurm/small-batch` | Fewer than 50 samples |
+| `config/slurm/large-batch` | 50 or more samples |
 
-**Step 1.** Open both profile files and fill in your cluster account and partition:
-
-```yaml
-# config/slurm/small-batch/config.yaml  (and large-batch/config.yaml)
-default-resources:
-  slurm_account: "my_account"
-  slurm_partition: "standard"
-```
-
-**Step 2.** Submit:
+Set your account and partition in each profile, then run one of:
 
 ```bash
 snakemake --profile config/slurm/small-batch
-# or
 snakemake --profile config/slurm/large-batch
 ```
 
-Both profiles set `scheduler: greedy`, `use-conda: true`, and all per-rule thread/memory/runtime limits. No additional flags are needed.
+The profiles already enable `use-conda` and the required greedy scheduler.
 
 ---
 
-### 4. Modular execution
+## Running only part of the workflow
 
-Use the `run_short_reads`, `run_contigs`, and `run_mags` config flags to run only the stages you need:
+Use these config flags:
 
-| `run_short_reads` | `run_contigs` | `run_mags` | What runs | External inputs required |
-|:-:|:-:|:-:|---|---|
-| ✅ | ✅ | ✅ | Full pipeline | None |
-| ✅ | ✅ | ❌ | QC + assembly + annotation | None |
-| ✅ | ❌ | ❌ | Short-reads AMR only | None |
-| ❌ | ✅ | ✅ | Assembly + annotation + MAGs | `clean_reads_dir` |
-| ❌ | ✅ | ❌ | Assembly + annotation | `clean_reads_dir` |
-| ❌ | ❌ | ✅ | MAG binning only | `contigs_dir` + `clean_reads_dir` |
-
-**`clean_reads_dir`** — directory with pre-filtered paired-end reads (`{sample}*R1*.fastq*` + `{sample}*R2*.fastq*`). Required when `run_short_reads: False` and any downstream stage is enabled.
-
-**`contigs_dir`** — directory with pre-assembled contig files named `{sample}.contigs.fa`. Required when `run_contigs: False` and `run_mags: True`.
-
-> **Note:** When `run_short_reads: False`, contig abundance is normalised to mean depth (cpg assumes n_genomes = 1) rather than true genome-equivalent copies, because SCG alignments from the short-reads stage are unavailable.
-
-Example — run short reads + assembly only (skip MAGs):
-```bash
-snakemake --use-conda --cores 32 --scheduler greedy --config run_mags=False
+```yaml
+run_short_reads: True
+run_contigs: True
+run_mags: True
 ```
 
-Example — run MAG stage on pre-assembled contigs:
-```bash
-snakemake --use-conda --cores 32 --scheduler greedy \
-  --config run_short_reads=False run_contigs=False \
-           contigs_dir=/path/to/contigs \
-           clean_reads_dir=/path/to/clean_reads
-```
+| `run_short_reads` | `run_contigs` | `run_mags` | Result | Extra input needed |
+|---|---|---|---|---|
+| `True` | `True` | `True` | Full pipeline | None |
+| `True` | `True` | `False` | Short reads + contigs | None |
+| `True` | `False` | `False` | Short reads only | None |
+| `False` | `True` | `True` | Contigs + MAGs | `clean_reads_dir` |
+| `False` | `True` | `False` | Contigs only | `clean_reads_dir` |
+| `False` | `False` | `True` | MAGs only | `clean_reads_dir`, `contigs_dir` |
+
+When skipping upstream stages:
+
+- `clean_reads_dir` must contain host-filtered paired FASTQs
+- `contigs_dir` must contain `{sample}.contigs.fa`
+
+If `run_short_reads: False`, contig abundance falls back to mean depth rather than fully normalized cpg because the SCG-based genome estimate is unavailable.
 
 ---
 
-## Outputs
+## Main outputs
 
 | Path | Description |
-|------|-------------|
-| `{out_dir}/fastp_summary.csv` | Per-sample fastp QC metrics + Nonpareil coverage |
-| `{out_dir}/short_reads_output.csv` | AMR gene abundances (cpg) from short-read KMA alignment |
-| `{out_dir}/markers_cpg.csv` | pBI143 and crAss001 cpg per sample |
-| `{out_dir}/contig_summary.tsv` | Per-contig: abundance, molecule type, taxonomy, AMR genes, MGEs |
-| `{out_dir}/AMR_unified.csv` | **Unified AMR table** — short-reads + contigs merged (see below) |
-| `{out_dir}/AMR_abundance_summary.csv` | Per-sample: total AMR cpg (unified) + pBI143 cpg + crAss001 cpg |
-| `{out_dir}/data/megahit/{sample}.contigs.fa` | Assembled contigs (headers prefixed `{sample}-`) |
-| `{out_dir}/data/genomad/{sample}/` | geNomad classification output |
-| `{out_dir}/data/mobmess/{sample}-mobmess_contigs.txt` | MobMess plasmid systems |
-| `{out_dir}/data/bins/{sample}/.binning.done` | MetaBAT2 binning sentinel |
-| `{out_dir}/data/bins/{sample}/mag_amr.tsv` | AMR genes per MAG |
-| `{out_dir}/data/bins/{sample}/mag_mge.tsv` | MGEs per MAG |
-| `{out_dir}/data/bins/{sample}/gtdbtk.summary.tsv` | GTDB-tk taxonomy per MAG *(if enabled)* |
-| `{out_dir}/data/bins/{sample}/mag_abundance.tsv` | Trimmed-mean relative abundance per MAG |
+|---|---|
+| `{out_dir}/fastp_summary.csv` | Per-sample fastp metrics and Nonpareil coverage |
+| `{out_dir}/assembly_qa.tsv` | Per-sample assembly QC metrics |
+| `{out_dir}/contig_summary.tsv` | Per-contig annotations and abundance |
+| `{out_dir}/AMR_abundance_summary.csv` | Per-sample AMR abundance and risk scores |
+| `{out_dir}/mag_summary.tsv` | Per-MAG summary table |
+| `{out_dir}/data/QAQC/short_reads_output.csv` | Short-read AMR gene abundances |
+| `{out_dir}/data/QAQC/markers_cpg.csv` | `pBI143` and `crAss001` copies per genome |
 
-### AMR_unified.csv columns
+`AMR_abundance_summary.csv` contains:
 
-| Column | Description |
-|--------|-------------|
-| `sample` | Sample identifier |
-| `gene_symbol` | AMRFinderPlus allele (join key across both streams) |
-| `gene_family` | Gene family grouping |
-| `product_name` | Full gene product name |
-| `class` / `subclass` | AMR drug class / subclass |
-| `type` / `subtype` | Feature type (AMR, STRESS, etc.) |
-| `cpg` | Preferred abundance: contig cpg if assembled, else short-reads cpg |
-| `evidence` | Detection source: `both`, `short_reads_only`, or `contigs_only` |
-| `short_reads_cpg` | Raw KMA-derived cpg (0 if not detected) |
-| `contig_cpg` | Contig-derived cpg (0 if not assembled) |
-| `molecule_type` | Comma-separated molecule types from geNomad (e.g. `chromosome,plasmid`) |
-| `taxonomy` | Modal contig taxonomy from MMseqs2 |
-| `n_contigs` | Number of distinct contigs carrying this gene (0 for short_reads_only) |
+| Column | Meaning |
+|---|---|
+| `sample` | Sample ID |
+| `AMR_total_cpg` | Total AMR abundance across detected genes |
+| `pBI143_cpg`, `crAss001_cpg` | Anthropogenic marker abundance |
+| `E_exposure` | Exposure score from marker abundance |
+| `R_mean` | Mean resistance-hazard score |
+| `M_mean` | Mean mobility score |
+| `H_mean` | Mean host/pathogenicity score |
+| `amr_risk_additive_raw`, `amr_risk_multiplicative_raw` | Raw study-level risk scores |
+| `amr_risk_additive`, `amr_risk_multiplicative` | Min-max normalized 0-100 scores |
 
 ---
 
-## Abundance normalisation
+## Abundance and risk scoring
 
-All AMR and contig abundances are expressed in **copies per genome (cpg)**:
+All AMR and contig abundances are reported as **copies per genome (cpg)**:
 
-```
-n_genomes = Σ(alignment_length / gene_length) / 40    # across 40 SCGs via DIAMOND
+```text
+n_genomes = Σ(alignment_length / gene_length) / 40
 cpg       = mean_depth / n_genomes
 ```
 
-The same `n_genomes` estimate from the SCG DIAMOND alignment is shared between short-read AMR normalisation and contig-level abundance.
+The 40-gene denominator comes from the bundled single-copy gene reference in `workflow/resources/SCGs_40_All.fasta`.
 
-**AMR_unified.csv cpg priority:** when a gene is detected by both streams, the contig cpg is used (higher specificity — derived from assembled sequence); otherwise the short-reads cpg is used (detects genes present at too low depth to assemble).
+Risk scoring combines four components:
+
+- **R** - resistance hazard from AMRFinderPlus class/subclass
+- **M** - mobility from contig type and nearby MGE evidence
+- **H** - host/pathogenicity from MMseqs2 taxonomy
+- **E** - exposure from `pBI143` and `crAss001`
+
+Both additive and multiplicative sample-level scores are reported.
 
 ---
 
-## Repository structure
+## Repository layout
 
-```
-config/
-  config.yaml                   # user configuration (in_dir, out_dir, gtdbtk_db only)
+```text
+config/                 user configuration and SLURM profiles
+docs/                   rule graph and session log
+test/                   mock data, mini databases, reproducible test scripts
 workflow/
-  Snakefile                     # entry point; defines rule all
-  resources/
-    SCGs_40_All.fasta           # 40 curated single-copy genes (ships with repo; no setup needed)
-  rules/
-    common.smk                  # sample discovery, test-mode overrides, resource helper
-    short_reads.smk             # QC, host filtering, AMR + SCG + marker alignment
-    contigs.smk                 # assembly, geNomad, MobMess, Prodigal, taxonomy, MGE, abundance
-    mags.smk                    # binning, per-MAG annotation, taxonomy, metabolism, abundance
-    summary.smk                 # cross-stage: AMR_unified + AMR_abundance_summary
-  envs/                         # per-rule conda environment YAML files
-  scripts/
-    short_reads_processing.R    # AMR + marker normalisation; outputs short_reads_output.csv + markers_cpg.csv
-    contig_abundance.py         # contig cpg abundance from BAM depth
-    contig_summary.py           # joins geNomad, MMseqs2, AMR, MGE, abundance per sample
-    amr_unified.py              # merges short-read + contig AMR; generates AMR_unified.csv + AMR_abundance_summary.csv
-    detect_circular_contigs.py  # Yu et al. 2024 circularity algorithm (used by MobMess rule)
-dbs/                            # auto-managed databases (gitignored; shared across datasets)
-                                #   short_reads/   — AMRFinderPlus KMA, SCG DIAMOND, human genome, markers
-                                #   genomad_db/    — geNomad classification database
-                                #   amrfinderplus_db/ — AMRFinderPlus protein database
-                                #   uniref50/      — MMseqs2 UniRef50 taxonomy database
-                                #   checkm2/       — CheckM2 reference database
-test/
-  data/                         # mock FASTQ pairs (mock1, mock2) — biologically realistic
-  dbs/                          # mini test databases (AMRFinderPlus subset, UniRef50 subset, etc.)
-  scripts/
-    generate_mock_data.py       # reproducible mock data generation script
-docs/
-  session-log.md                # Copilot session log
+  Snakefile             workflow entry point
+  envs/                 per-rule conda environments
+  resources/            bundled reference files
+  rules/                short-read, contig, MAG, and summary rules
+  scripts/              Python/R scripts used by rules
+dbs/                    auto-managed databases (gitignored)
 ```

@@ -1152,3 +1152,22 @@ one is 100 (expected behaviour; will spread meaningfully with more production sa
 - Normalised risk scores with only 2 test samples are always 0/100 — not a bug, expected with min-max when n=2.
 - `checkm2.yaml`, `gtdbtk.yaml`, `metabolic.yaml` still not version-pinned.
 - Consider end-to-end test on real production samples to validate risk scores in a realistic multi-sample cohort.
+
+---
+
+## 2026-04-14 (session 33)
+
+### What was done
+- Refreshed `README.md` to match the current pipeline outputs and remove stale references to `AMR_unified.csv`.
+- Reorganized the README around the user workflow: quick start, production setup, databases, SLURM, partial runs, and main outputs.
+- Simplified wording throughout and documented the current sample-level risk scoring output in `AMR_abundance_summary.csv`.
+- Added the newer top-level outputs `assembly_qa.tsv` and `mag_summary.tsv`, and corrected short-read table paths to `data/QAQC/short_reads_output.csv` and `data/QAQC/markers_cpg.csv`.
+
+### Current pipeline state
+- HEAD before this documentation update: `9222364`, pushed to `origin/main`.
+- Full end-to-end test mode still last recorded as passing for both mock samples.
+- Primary documented outputs are now aligned with the current workflow: `fastp_summary.csv`, `assembly_qa.tsv`, `contig_summary.tsv`, `AMR_abundance_summary.csv`, and `mag_summary.tsv`.
+
+### Known issues / next steps
+- No new pipeline issues introduced; this session was documentation-only.
+- The existing follow-ups remain: environment version pinning for `checkm2.yaml`, `gtdbtk.yaml`, and `metabolic.yaml`, plus validation on a larger real cohort.
