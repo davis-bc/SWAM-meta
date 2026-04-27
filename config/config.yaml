@@ -10,7 +10,7 @@ out_dir: ""    # Output root directory (per-dataset analysis outputs)
 # -------------------------------------------------------------------
 
 # Run fastp QC, host removal, KMA/DIAMOND alignments, Nonpareil,
-# and short_reads_summary (short_reads_output.csv, markers_cpg.csv).
+# and short_reads_summary (top-level short_reads_output.csv + backend markers_cpg.csv).
 run_short_reads: True
 
 # Run MEGAHIT assembly + all contig annotation (geNomad, MobMess,

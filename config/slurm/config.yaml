@@ -1,0 +1,126 @@
+# Default Slurm profile for SWAM-meta.
+#
+# This is the single supported HPC profile. Heavy assembly / classification /
+# binning rules scale their memory and runtime in the Snakefile across retry
+# attempts, so they are intentionally omitted from set-resources below.
+
+executor: slurm
+scheduler: greedy
+
+jobs: 100
+cores: 1024
+
+use-conda: true
+conda-frontend: conda
+keep-incomplete: true
+keep-going: true
+rerun-incomplete: true
+restart-times: 2
+latency-wait: 60
+show-failed-logs: true
+quiet:
+  - rules
+
+default-resources:
+  slurm_account: ""
+  slurm_partition: ""
+  mem_mb: 4000
+  runtime: 360
+
+groups:
+  contig_amr: "contig-amr"
+  mge_annotation: "mge-annotation"
+  mag_amr: "mag-amr"
+  mag_mge: "mag-mge"
+  mag_qc: "mag-qc"
+  mag_abundance: "mag-abundance"
+
+group-components:
+  contig-amr: 8
+  mge-annotation: 8
+  mag-amr: 8
+  mag-mge: 8
+  mag-qc: 4
+  mag-abundance: 4
+
+set-threads:
+  init_mmseqs_db: 16
+  short_reads: 16
+  contigs: 32
+  genomad: 32
+  mobmess: 32
+  prodigal: 1
+  contig_amr: 16
+  mge_annotation: 16
+  mmseqs_taxonomy: 32
+  contig_abundance: 16
+  bin: 32
+  mag_prodigal: 1
+  mag_amr: 16
+  mag_mge: 16
+  mag_taxonomy: 64
+  mag_metabolism: 64
+  mag_qc: 16
+  mag_abundance: 16
+
+set-resources:
+  initiate_dbs:
+    mem_mb: 8000
+    runtime: 240
+  init_genomad:
+    mem_mb: 8000
+    runtime: 240
+  init_mmseqs_db:
+    mem_mb: 32000
+    runtime: 4320
+  init_amrfinder_db:
+    mem_mb: 16000
+    runtime: 240
+  init_checkm2_db:
+    mem_mb: 16000
+    runtime: 240
+  init_mge_tool:
+    mem_mb: 4000
+    runtime: 60
+  short_reads:
+    mem_mb: 20000
+    runtime: 600
+  mobmess:
+    mem_mb: 150000
+    runtime: 1440
+  prodigal:
+    mem_mb: 16000
+    runtime: 240
+  contig_amr:
+    mem_mb: 16000
+    runtime: 360
+  mge_annotation:
+    mem_mb: 16000
+    runtime: 360
+  mmseqs_taxonomy:
+    mem_mb: 64000
+    runtime: 1440
+  contig_abundance:
+    mem_mb: 20000
+    runtime: 360
+  mag_prodigal:
+    mem_mb: 16000
+    runtime: 360
+  mag_amr:
+    mem_mb: 16000
+    runtime: 360
+  mag_mge:
+    mem_mb: 16000
+    runtime: 360
+  mag_taxonomy:
+    mem_mb: 150000
+    runtime: 2160
+  mag_metabolism:
+    mem_mb: 150000
+    runtime: 1440
+  mag_qc:
+    mem_mb: 32000
+    runtime: 480
+  mag_abundance:
+    mem_mb: 32000
+    runtime: 240

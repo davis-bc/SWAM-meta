@@ -19,19 +19,31 @@ import os
 #   One-time: download CheckM2 reference database into _DBS_DIR
 # ---------------------------------------------------------------------------
 
+BIN_MEM_MB_BY_ATTEMPT = (150000, 180000, 220000)
+BIN_RUNTIME_BY_ATTEMPT = (1440, 2160, 2880)
+
+
+def bin_mem_mb(_, attempt):
+    return res(attempt_value(BIN_MEM_MB_BY_ATTEMPT, attempt), 6000)
+
+
+def bin_runtime(_, attempt):
+    return 180 if _TEST else attempt_value(BIN_RUNTIME_BY_ATTEMPT, attempt)
+
 rule init_checkm2_db:
     output:
-        done = os.path.join(_DBS_DIR, "checkm2", ".done")
+        done = os.path.join(_DB_CHECKM2_DIR, ".done")
     params:
-        db_dir    = os.path.join(_DBS_DIR, "checkm2"),
+        db_dir    = _DB_CHECKM2_DIR,
         db_path   = _CHECKM2_DB,
         skip      = config.get("skip_checkm2", False),
         test_mode = _TEST
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "init_checkm2_db.log")
+        rule_log("init_checkm2_db")
     conda: "../envs/checkm2.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p {params.db_dir}
         if [ "{params.skip}" = "True" ]; then
             echo "CheckM2: database setup skipped (skip_checkm2=True)"
@@ -65,13 +77,15 @@ rule bin:
         min_cls    = lambda wc: res(200000, 50000)
     threads: lambda wc: res(32, 4)
     resources:
-        mem_mb  = lambda wc: res(150000, 6000),
+        mem_mb  = bin_mem_mb,
+        runtime = bin_runtime,
         threads = lambda wc: res(32, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.bin.log")
+        sample_log("bin")
     conda: "../envs/mags.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p {params.bin_dir}
 
         echo "[{wildcards.sample}] MetaBAT2: profiling contig depths..."
@@ -125,10 +139,11 @@ checkpoint mag_prodigal:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = 1,
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_prodigal.log")
+        sample_log("mag_prodigal")
     conda: "../envs/mags.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p {params.prd_dir}
         echo "[{wildcards.sample}] Prodigal: predicting genes in MAG bins..."
         for fa in {params.bin_dir}/*.fa; do
@@ -164,10 +179,11 @@ rule mag_amr:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_amr.log")
+        sample_log("mag_amr")
     conda: "../envs/mags.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         echo "[{wildcards.sample}] AMRFinderPlus: annotating MAG bins..."
         # Write a header-only TSV then append per-bin results
         TMP_AMR=$(mktemp)
@@ -218,10 +234,11 @@ rule mag_mge:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_mge.log")
+        sample_log("mag_mge")
     conda: "../envs/contigs.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p {params.tmp_dir}
         echo "[{wildcards.sample}] MobileElementFinder: annotating MAG MGEs..."
         TMP_MGE=$(mktemp)
@@ -270,10 +287,11 @@ rule mag_taxonomy:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(64, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_taxonomy.log")
+        sample_log("mag_taxonomy")
     conda: "../envs/gtdbtk.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         if [ "{params.skip}" = "True" ]; then
             echo "[{wildcards.sample}] GTDB-tk: skipped (skip_gtdbtk=True)"
             printf "user_genome\\tclassification\\n" > {output.tsv}
@@ -306,7 +324,7 @@ rule mag_taxonomy:
 rule mag_metabolism:
     input:
         done          = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"),
-        metabolic_done = os.path.join(_SR_DBS_DIR, ".metabolic.done")
+        metabolic_done = os.path.join(_DB_METABOLIC_DIR, f".done{_DB_TAG}")
     output:
         done = os.path.join(output_dir, "data", "bins", "{sample}", ".metabolic.done")
     params:
@@ -319,10 +337,11 @@ rule mag_metabolism:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(64, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_metabolism.log")
+        sample_log("mag_metabolism")
     conda: "../envs/metabolic.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         if [ "{params.skip}" = "True" ]; then
             echo "[{wildcards.sample}] METABOLIC: skipped (skip_metabolic=True)"
         else
@@ -345,7 +364,7 @@ rule mag_metabolism:
 rule mag_qc:
     input:
         done         = os.path.join(output_dir, "data", "bins", "{sample}", ".binning.done"),
-        checkm2_done = os.path.join(_DBS_DIR, "checkm2", ".done")
+        checkm2_done = os.path.join(_DB_CHECKM2_DIR, ".done")
     output:
         tsv  = os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv")
     params:
@@ -358,10 +377,11 @@ rule mag_qc:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_qc.log")
+        sample_log("mag_qc")
     conda: "../envs/checkm2.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         if [ "{params.skip}" = "True" ]; then
             echo "[{wildcards.sample}] CheckM2: skipped (skip_checkm2=True)"
             printf "Name\\tCompleteness\\tContamination\\n" > {output.tsv}
@@ -401,10 +421,11 @@ rule mag_abundance:
         mem_mb  = lambda wc: res(32000, 4000),
         threads = lambda wc: res(16, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mag_abundance.log")
+        sample_log("mag_abundance")
     conda: "../envs/shortreads.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         # Count bins; if none exist write empty output and exit cleanly
         n_bins=$(find {params.bin_dir} -name "*.fa" 2>/dev/null | wc -l)
         if [ "$n_bins" -eq 0 ]; then
@@ -412,13 +433,47 @@ rule mag_abundance:
             printf "Genome\\ttrimmed_mean\\n" > {output.tsv}
         else
             echo "[{wildcards.sample}] CoverM: computing MAG abundance..."
+            TMP_BIN_DIR=$(mktemp -d "$(dirname {output.tsv})/coverm_bins_{wildcards.sample}.tmp.XXXXXX")
+            SEEN_IDS="$TMP_BIN_DIR/seen_ids.txt"
+            : > "$SEEN_IDS"
+            for fa in {params.bin_dir}/*.fa; do
+                [ -f "$fa" ] || continue
+                out_fa="$TMP_BIN_DIR/$(basename "$fa")"
+                awk -v seen="$SEEN_IDS" '
+                    BEGIN {{
+                        while ((getline line < seen) > 0) keep[line] = 1
+                        close(seen)
+                    }}
+                    /^>/ {{
+                        id = substr($1, 2)
+                        write_record = !(id in keep)
+                        if (write_record) {{
+                            print id >> seen
+                            keep[id] = 1
+                        }}
+                    }}
+                    write_record {{ print }}
+                ' "$fa" > "$out_fa"
+                if [ ! -s "$out_fa" ]; then
+                    rm -f "$out_fa"
+                fi
+            done
+
+            n_sanitized=$(find "$TMP_BIN_DIR" -maxdepth 1 -name "*.fa" | wc -l)
+            if [ "$n_sanitized" -eq 0 ]; then
+                printf "Genome\\ttrimmed_mean\\n" > {output.tsv}
+                rm -rf "$TMP_BIN_DIR"
+                exit 0
+            fi
+
             coverm genome \
                 --bam-files {input.bam} \
-                --genome-fasta-files {params.bin_dir}/*.fa \
+                --genome-fasta-files "$TMP_BIN_DIR"/*.fa \
                 --methods trimmed_mean \
                 --min-covered-fraction 0.1 \
                 --threads {resources.threads} \
                 --output-file {output.tsv} >> {log} 2>&1
+            rm -rf "$TMP_BIN_DIR"
             echo "[{wildcards.sample}] CoverM: done"
         fi
         """

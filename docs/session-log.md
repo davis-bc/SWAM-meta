@@ -1171,3 +1171,45 @@ one is 100 (expected behaviour; will spread meaningfully with more production sa
 ### Known issues / next steps
 - No new pipeline issues introduced; this session was documentation-only.
 - The existing follow-ups remain: environment version pinning for `checkm2.yaml`, `gtdbtk.yaml`, and `metabolic.yaml`, plus validation on a larger real cohort.
+
+---
+
+## 2026-04-27 (session 34)
+
+### What was done
+- Replaced the dual Slurm profiles with a single default profile at `config/slurm/config.yaml`.
+  - Added resilient execution defaults: `keep-going`, `rerun-incomplete`, `restart-times`, `latency-wait`, and grouped execution for lightweight sample-parallel rules.
+  - Kept heavy `contigs`, `genomad`, and `bin` resource scaling in-rule so memory/runtime can grow across retry attempts.
+- Added `run_swam-meta.sh` as the default HPC entrypoint.
+  - Writes a timestamped driver log under `{out_dir}/logs/run_status/`.
+  - Runs the new post-run summary generator `workflow/scripts/build_run_report.py`.
+- Added a run-status system modeled on SWAM-g.
+  - Per-rule logs now live under `{out_dir}/logs/` (`logs/<rule>/<sample>.log` for sample rules, `logs/<rule>.log` for global rules).
+  - New run-status outputs: `{out_dir}/logs/run_status/run_report.txt` and `{out_dir}/logs/run_status/sample_rule_status.tsv`.
+- Reorganized database path handling in `workflow/rules/common.smk` and init rules.
+  - New per-tool / per-reference layout: `dbs/amrfinderplus/`, `dbs/amrfinderplus_kma/`, `dbs/checkm2/`, `dbs/genomad/`, `dbs/human/`, `dbs/markers/`, `dbs/metabolic/`, `dbs/scg/`, `dbs/uniref50/`.
+  - Added legacy-layout migration logic so old `dbs/short_reads/`, `dbs/genomad_db/`, and `dbs/amrfinderplus_db/` contents can be reused instead of re-downloaded.
+- Promoted `short_reads_output.csv` back to a top-level key output at `{out_dir}/short_reads_output.csv`.
+  - Kept `markers_cpg.csv` in `data/QAQC/` as the backend support table for exposure scoring.
+  - Updated `Snakefile`, summary rules, README, config comments, and Copilot instructions to match.
+- Fixed a MAG abundance edge case uncovered by the rerun.
+  - `coverm genome` failed when MetaBAT bins shared duplicate contig IDs.
+  - `mag_abundance` now builds a temporary de-duplicated bin FASTA set for CoverM so the workflow completes cleanly on the test dataset.
+
+### Current pipeline state
+- Working tree on `main` contains the Slurm/profile/logging/db-layout overhaul; not yet committed in this session.
+- Full end-to-end test mode passes again after the overhaul:
+  - `snakemake --use-conda --cores 4 --scheduler greedy --config test=True --rerun-incomplete`
+- The new run-status report generator was smoke-tested successfully against `test/output/`.
+- Key top-level outputs are now:
+  - `fastp_summary.csv`
+  - `short_reads_output.csv`
+  - `assembly_qa.tsv`
+  - `contig_summary.tsv`
+  - `AMR_abundance_summary.csv`
+  - `mag_summary.tsv`
+
+### Known issues / next steps
+- `checkm2.yaml`, `gtdbtk.yaml`, and `metabolic.yaml` are still not version-pinned.
+- The new Slurm wrapper/reporting path was validated locally and against test outputs, but not yet on a real cluster submission.
+- A larger real cohort is still needed to validate risk-score spread beyond the 2-sample mock test.

@@ -4,42 +4,79 @@
 
 rule initiate_dbs:
     output:
-        afp_db         = os.path.join(_SR_DBS_DIR, f".afp{_DB_TAG}.done"),
-        scg_db         = os.path.join(_SR_DBS_DIR, f".scg{_DB_TAG}.done"),
-        afp_metadata   = os.path.join(_SR_DBS_DIR, "ReferenceGeneCatalog.txt"),
-        h_genome_done  = os.path.join(_SR_DBS_DIR, f".h_genome{_DB_TAG}.done"),
-        markers_db     = os.path.join(_SR_DBS_DIR, f".markers{_DB_TAG}.done"),
-        metabolic_done = os.path.join(_SR_DBS_DIR, f".metabolic{_DB_TAG}.done")
+        afp_db         = os.path.join(_DB_AMR_KMA_DIR, f".done{_DB_TAG}"),
+        scg_db         = os.path.join(_DB_SCG_DIR, f".done{_DB_TAG}"),
+        afp_metadata   = os.path.join(_DB_AMR_KMA_DIR, "ReferenceGeneCatalog.txt"),
+        h_genome_done  = os.path.join(_DB_HUMAN_DIR, f".done{_DB_TAG}"),
+        markers_db     = os.path.join(_DB_MARKERS_DIR, f".done{_DB_TAG}"),
+        metabolic_done = os.path.join(_DB_METABOLIC_DIR, f".done{_DB_TAG}")
     params:
-        dbs_dir          = _SR_DBS_DIR,
-        h_genome_path    = os.path.join(_SR_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        amr_kma_dir      = _DB_AMR_KMA_DIR,
+        human_dir        = _DB_HUMAN_DIR,
+        markers_dir      = _DB_MARKERS_DIR,
+        scg_dir          = _DB_SCG_DIR,
+        metabolic_root   = _DB_METABOLIC_DIR,
+        h_genome_path    = os.path.join(_DB_HUMAN_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
         scg_db           = _SCG_DB,
+        scg_source       = _SCG_SOURCE_FASTA,
         skip_metabolic   = config.get("skip_metabolic", False),
         metabolic_dir    = _METABOLIC_DIR,
+        legacy_root      = _DBS_DIR,
+        legacy_sr_dir    = _LEGACY_SR_DBS_DIR,
         test_mode        = _TEST,
         test_amr_fa      = os.path.join(_REPO, "test", "dbs", "amrfinder", "AMR_CDS.fa"),
         test_meta        = os.path.join(_REPO, "test", "dbs", "amrfinder", "ReferenceGeneCatalog.txt"),
         test_human       = os.path.join(_REPO, "test", "dbs", "human", "human_mini.fna.gz"),
         test_markers_dir = os.path.join(_REPO, "test", "dbs", "markers"),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "initiate_dbs.log")
+        rule_log("initiate_dbs")
     conda: "../envs/shortreads.yaml"
     shell:
         """
-        mkdir -p {params.dbs_dir}
+        mkdir -p "$(dirname {log})" \
+                 {params.amr_kma_dir} \
+                 {params.human_dir} \
+                 {params.markers_dir} \
+                 {params.scg_dir} \
+                 {params.metabolic_root}
+
+        # Migrate legacy dbs/ layouts into per-tool subdirectories when needed.
+        if [ -d "{params.legacy_sr_dir}" ]; then
+            [ -f "{params.legacy_sr_dir}/AMR_CDS.fa" ] && mv -n "{params.legacy_sr_dir}/AMR_CDS.fa" "{params.amr_kma_dir}/AMR_CDS.fa" || true
+            [ -f "{params.legacy_sr_dir}/ReferenceGeneCatalog.txt" ] && mv -n "{params.legacy_sr_dir}/ReferenceGeneCatalog.txt" "{params.amr_kma_dir}/ReferenceGeneCatalog.txt" || true
+            [ -f "{params.legacy_sr_dir}/afp_db.name" ] && mv -n "{params.legacy_sr_dir}"/afp_db.* "{params.amr_kma_dir}/" || true
+            [ -f "{params.legacy_sr_dir}/GCF_000001405.40_GRCh38.p14_genomic.fna.gz" ] && mv -n "{params.legacy_sr_dir}/GCF_000001405.40_GRCh38.p14_genomic.fna.gz" "{params.human_dir}/" || true
+            [ -f "{params.legacy_sr_dir}/markers.fa" ] && mv -n "{params.legacy_sr_dir}/markers.fa" "{params.markers_dir}/markers.fa" || true
+            [ -f "{params.legacy_sr_dir}/pBI143.fasta" ] && mv -n "{params.legacy_sr_dir}/pBI143.fasta" "{params.markers_dir}/" || true
+            [ -f "{params.legacy_sr_dir}/crAss001.fasta" ] && mv -n "{params.legacy_sr_dir}/crAss001.fasta" "{params.markers_dir}/" || true
+            [ -f "{params.legacy_sr_dir}/markers_db.name" ] && mv -n "{params.legacy_sr_dir}"/markers_db.* "{params.markers_dir}/" || true
+            [ -f "{params.legacy_sr_dir}/scg_db.dmnd" ] && mv -n "{params.legacy_sr_dir}/scg_db.dmnd" "{params.scg_dir}/" || true
+            [ -d "{params.legacy_sr_dir}/METABOLIC" ] && mv -n "{params.legacy_sr_dir}/METABOLIC" "{params.metabolic_root}/" || true
+        fi
+
+        [ -f "{params.legacy_root}/AMR_CDS.fa" ] && mv -n "{params.legacy_root}/AMR_CDS.fa" "{params.amr_kma_dir}/AMR_CDS.fa" || true
+        [ -f "{params.legacy_root}/ReferenceGeneCatalog.txt" ] && mv -n "{params.legacy_root}/ReferenceGeneCatalog.txt" "{params.amr_kma_dir}/ReferenceGeneCatalog.txt" || true
+        [ -f "{params.legacy_root}/afp_db.name" ] && mv -n "{params.legacy_root}"/afp_db.* "{params.amr_kma_dir}/" || true
+        [ -f "{params.legacy_root}/GCF_000001405.40_GRCh38.p14_genomic.fna.gz" ] && mv -n "{params.legacy_root}/GCF_000001405.40_GRCh38.p14_genomic.fna.gz" "{params.human_dir}/" || true
+        [ -f "{params.legacy_root}/markers.fa" ] && mv -n "{params.legacy_root}/markers.fa" "{params.markers_dir}/markers.fa" || true
+        [ -f "{params.legacy_root}/pBI143.fasta" ] && mv -n "{params.legacy_root}/pBI143.fasta" "{params.markers_dir}/" || true
+        [ -f "{params.legacy_root}/crAss001.fasta" ] && mv -n "{params.legacy_root}/crAss001.fasta" "{params.markers_dir}/" || true
+        [ -f "{params.legacy_root}/markers_db.name" ] && mv -n "{params.legacy_root}"/markers_db.* "{params.markers_dir}/" || true
+        [ -f "{params.legacy_root}/scg_db.dmnd" ] && mv -n "{params.legacy_root}/scg_db.dmnd" "{params.scg_dir}/" || true
+        [ -d "{params.legacy_root}/METABOLIC" ] && mv -n "{params.legacy_root}/METABOLIC" "{params.metabolic_root}/" || true
 
         if [ "{params.test_mode}" = "True" ]; then
 
             echo "initiate_dbs: indexing AMRFinderPlus database (test)..."
-            cp {params.test_amr_fa} {params.dbs_dir}/AMR_CDS.fa
-            kma index -i {params.dbs_dir}/AMR_CDS.fa \
-                      -o {params.dbs_dir}/afp_db >> {log} 2>&1
+            cp {params.test_amr_fa} {params.amr_kma_dir}/AMR_CDS.fa
+            kma index -i {params.amr_kma_dir}/AMR_CDS.fa \
+                      -o {params.amr_kma_dir}/afp_db >> {log} 2>&1
             touch {output.afp_db}
             cp {params.test_meta} {output.afp_metadata}
 
             echo "initiate_dbs: building SCG DIAMOND database (test)..."
-            diamond makedb --in {params.scg_db} \
-                           -d {params.dbs_dir}/scg_db --quiet >> {log} 2>&1
+            diamond makedb --in {params.scg_source} \
+                           -d {params.scg_db} --quiet >> {log} 2>&1
             touch {output.scg_db}
             cp {params.test_human} {params.h_genome_path}
             touch {output.h_genome_done}
@@ -47,41 +84,43 @@ rule initiate_dbs:
             echo "initiate_dbs: indexing anthropogenic markers (test)..."
             cat {params.test_markers_dir}/pBI143.fasta \
                 {params.test_markers_dir}/crAss001.fasta \
-                > {params.dbs_dir}/markers.fa
-            kma index -i {params.dbs_dir}/markers.fa \
-                      -o {params.dbs_dir}/markers_db >> {log} 2>&1
+                > {params.markers_dir}/markers.fa
+            cp {params.test_markers_dir}/pBI143.fasta {params.markers_dir}/pBI143.fasta
+            cp {params.test_markers_dir}/crAss001.fasta {params.markers_dir}/crAss001.fasta
+            kma index -i {params.markers_dir}/markers.fa \
+                      -o {params.markers_dir}/markers_db >> {log} 2>&1
             touch {output.markers_db}
 
             touch {output.metabolic_done}
 
         else
 
-            if [ ! -f "{params.dbs_dir}/AMR_CDS.fa" ]; then
+            if [ ! -f "{params.amr_kma_dir}/AMR_CDS.fa" ]; then
                 echo "initiate_dbs: downloading AMRFinderPlus CDS..."
-                wget --show-progress -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa 2>&1 | tee -a {log}
+                wget --show-progress -P {params.amr_kma_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/AMR_CDS.fa 2>&1 | tee -a {log}
             else
                 echo "initiate_dbs: AMR_CDS.fa already present, skipping download"
             fi
             if [ ! -f "{output.afp_metadata}" ]; then
                 echo "initiate_dbs: downloading ReferenceGeneCatalog.txt..."
-                wget --show-progress -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt 2>&1 | tee -a {log}
+                wget --show-progress -P {params.amr_kma_dir} https://ftp.ncbi.nlm.nih.gov/pathogen/Antimicrobial_resistance/AMRFinderPlus/database/latest/ReferenceGeneCatalog.txt 2>&1 | tee -a {log}
             else
                 echo "initiate_dbs: ReferenceGeneCatalog.txt already present, skipping"
             fi
 
-            if [ ! -f "{params.dbs_dir}/afp_db.name" ]; then
+            if [ ! -f "{params.amr_kma_dir}/afp_db.name" ]; then
                 echo "initiate_dbs: indexing AMRFinderPlus database..."
-                kma index -i {params.dbs_dir}/AMR_CDS.fa \
-                          -o {params.dbs_dir}/afp_db >> {log} 2>&1
+                kma index -i {params.amr_kma_dir}/AMR_CDS.fa \
+                          -o {params.amr_kma_dir}/afp_db >> {log} 2>&1
             else
                 echo "initiate_dbs: KMA AFP index already present, skipping"
             fi
             touch {output.afp_db}
 
-            if [ ! -f "{params.dbs_dir}/scg_db.dmnd" ]; then
+            if [ ! -f "{params.scg_dir}/scg_db.dmnd" ]; then
                 echo "initiate_dbs: building SCG DIAMOND database..."
-                diamond makedb --in {params.scg_db} \
-                               -d {params.dbs_dir}/scg_db --quiet >> {log} 2>&1
+                diamond makedb --in {params.scg_source} \
+                               -d {params.scg_db} --quiet >> {log} 2>&1
             else
                 echo "initiate_dbs: SCG DIAMOND database already present, skipping"
             fi
@@ -89,27 +128,27 @@ rule initiate_dbs:
 
             if [ ! -f "{params.h_genome_path}" ]; then
                 echo "initiate_dbs: downloading human reference genome..."
-                wget --show-progress -P {params.dbs_dir} https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz 2>&1 | tee -a {log}
+                wget --show-progress -P {params.human_dir} https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz 2>&1 | tee -a {log}
             else
                 echo "initiate_dbs: human reference genome already present, skipping"
             fi
             touch {output.h_genome_done}
 
-            if [ ! -f "{params.dbs_dir}/markers.fa" ]; then
+            if [ ! -f "{params.markers_dir}/markers.fa" ]; then
                 echo "initiate_dbs: downloading anthropogenic markers (pBI143, crAss001)..."
-                wget --show-progress -O {params.dbs_dir}/pBI143.fasta \
+                wget --show-progress -O {params.markers_dir}/pBI143.fasta \
                     "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=U30316.1&rettype=fasta&retmode=text" 2>&1 | tee -a {log}
-                wget --show-progress -O {params.dbs_dir}/crAss001.fasta \
+                wget --show-progress -O {params.markers_dir}/crAss001.fasta \
                     "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_049977.1&rettype=fasta&retmode=text" 2>&1 | tee -a {log}
-                cat {params.dbs_dir}/pBI143.fasta {params.dbs_dir}/crAss001.fasta \
-                    > {params.dbs_dir}/markers.fa
+                cat {params.markers_dir}/pBI143.fasta {params.markers_dir}/crAss001.fasta \
+                    > {params.markers_dir}/markers.fa
             else
                 echo "initiate_dbs: markers.fa already present, skipping download"
             fi
-            if [ ! -f "{params.dbs_dir}/markers_db.name" ]; then
+            if [ ! -f "{params.markers_dir}/markers_db.name" ]; then
                 echo "initiate_dbs: indexing anthropogenic markers..."
-                kma index -i {params.dbs_dir}/markers.fa \
-                          -o {params.dbs_dir}/markers_db >> {log} 2>&1
+                kma index -i {params.markers_dir}/markers.fa \
+                          -o {params.markers_dir}/markers_db >> {log} 2>&1
             else
                 echo "initiate_dbs: KMA markers index already present, skipping"
             fi
@@ -141,12 +180,12 @@ rule short_reads:
     input:
         r1          = get_r1,
         r2          = get_r2,
-        afp_db      = os.path.join(_SR_DBS_DIR, f".afp{_DB_TAG}.done"),
-        scg_db      = os.path.join(_SR_DBS_DIR, f".scg{_DB_TAG}.done"),
-        h_genome    = os.path.join(_SR_DBS_DIR, f".h_genome{_DB_TAG}.done"),
-        markers_db  = os.path.join(_SR_DBS_DIR, f".markers{_DB_TAG}.done")
+        afp_db      = os.path.join(_DB_AMR_KMA_DIR, f".done{_DB_TAG}"),
+        scg_db      = os.path.join(_DB_SCG_DIR, f".done{_DB_TAG}"),
+        h_genome    = os.path.join(_DB_HUMAN_DIR, f".done{_DB_TAG}"),
+        markers_db  = os.path.join(_DB_MARKERS_DIR, f".done{_DB_TAG}")
     params:
-        h_genome         = os.path.join(_SR_DBS_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
+        h_genome         = os.path.join(_DB_HUMAN_DIR, "GCF_000001405.40_GRCh38.p14_genomic.fna.gz"),
         min_read_length  = config.get("min_read_length", 50),
     output:
         json        = os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"),
@@ -163,11 +202,16 @@ rule short_reads:
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.short_reads.txt")
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.short_reads.log")
+        sample_log("short_reads")
     conda: "../envs/shortreads.yaml"
     shell:
         """
         set -euo pipefail
+        mkdir -p "$(dirname {log})" \
+                 "$(dirname {output.json})" \
+                 "$(dirname {output.r1_clean})" \
+                 "$(dirname {output.nonpareil})" \
+                 "$(dirname {output.afp})"
         export TMPDIR="$(dirname {output.r1_clean})"
         
         TMP_R1="$TMPDIR/{wildcards.sample}_R1.fastq.gz"
@@ -224,14 +268,14 @@ rule short_reads_summary:
         scgs            = expand(os.path.join(output_dir, "data", "alignments", "{sample}.scgs"), sample=samples),
         npos            = expand(os.path.join(output_dir, "data", "QAQC", "nonpareil", "{sample}.npo"), sample=samples),
         jsons           = expand(os.path.join(output_dir, "data", "QAQC", "fastp_reports", "{sample}.json"), sample=samples),
-        afp_metadata    = os.path.join(_SR_DBS_DIR, "ReferenceGeneCatalog.txt"),
+        afp_metadata    = os.path.join(_DB_AMR_KMA_DIR, "ReferenceGeneCatalog.txt"),
         markers_files   = expand(os.path.join(output_dir, "data", "alignments", "{sample}.markers.res"), sample=samples)
     output:
-        fastp            = os.path.join(output_dir, "fastp_summary.csv"),
-        afp              = os.path.join(output_dir, "data", "QAQC", "short_reads_output.csv"),
-        markers_cpg      = os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv")
+        fastp            = FASTP_SUMMARY,
+        afp              = SHORT_READS_OUTPUT,
+        markers_cpg      = MARKERS_CPG_OUTPUT
     conda: "../envs/Renv.yaml"
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "short_reads_summary.log")
+        rule_log("short_reads_summary")
     script:
         "../scripts/short_reads_processing.R"

@@ -20,16 +20,16 @@
 
 rule amr_risk_score:
     input:
-        short_reads    = os.path.join(output_dir, "data", "QAQC", "short_reads_output.csv"),
-        markers_cpg    = os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv"),
-        contig_summary = ([os.path.join(output_dir, "contig_summary.tsv")] if _RUN_CTG else []),
+        short_reads    = SHORT_READS_OUTPUT,
+        markers_cpg    = MARKERS_CPG_OUTPUT,
+        contig_summary = ([CONTIG_SUMMARY_OUTPUT] if _RUN_CTG else []),
     output:
-        os.path.join(output_dir, "AMR_abundance_summary.csv")
+        AMR_ABUNDANCE_SUMMARY_OUTPUT
     params:
         samples = samples,
     conda: "../envs/contigs.yaml"
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "amr_risk_score.log")
+        rule_log("amr_risk_score")
     script:
         "../scripts/amr_risk_score.py"
 
@@ -49,7 +49,7 @@ rule mag_summary:
             sample=samples
         ),
     output:
-        tsv = os.path.join(output_dir, "mag_summary.tsv")
+        tsv = MAG_SUMMARY_OUTPUT
     params:
         samples      = samples,
         output_dir   = output_dir,
@@ -57,6 +57,6 @@ rule mag_summary:
         skip_gtdbtk  = lambda wc: config.get("skip_gtdbtk",  False),
     conda: "../envs/contigs.yaml"
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "mag_summary.log")
+        rule_log("mag_summary")
     script:
         "../scripts/mag_summary.py"

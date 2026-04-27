@@ -1,17 +1,15 @@
-import os
 import glob
-import pandas as pd
+import os
 import re
-import csv
 
 # ---------------------------------------------------------------------------
 #   Test-mode path overrides
 #   Activated with:  snakemake --config test=True
 # ---------------------------------------------------------------------------
 
-_TEST    = config.get("test", False)
-_DB_TAG  = ".test" if _TEST else ""          # isolates test sentinels from production
-_REPO    = os.path.dirname(os.path.dirname(os.path.dirname(workflow.snakefile)))
+_TEST   = config.get("test", False)
+_DB_TAG = ".test" if _TEST else ""
+_REPO   = os.path.dirname(os.path.dirname(os.path.dirname(workflow.snakefile)))
 
 if _TEST:
     input_dir  = os.path.join(_REPO, "test", "data")
@@ -27,21 +25,58 @@ else:
     output_dir = config.get("out_dir", "")
 
 # ---------------------------------------------------------------------------
-#   Database paths — all production databases live in SWAM-meta/dbs/
-#   (gitignored). Test mode uses mini FASTAs from test/dbs/ for inputs
-#   but writes built indices to the same dbs/ directory.
+#   Database paths
+#   All production databases live in SWAM-meta/dbs/ under one subdirectory per
+#   tool or reference bundle. Legacy paths are kept here so init rules can
+#   migrate older layouts in-place without forcing unnecessary re-downloads.
 # ---------------------------------------------------------------------------
 
-_DBS_DIR    = os.path.join(_REPO, "dbs")
-_SR_DBS_DIR = os.path.join(_DBS_DIR, "short_reads")   # initiate_dbs artifacts
-_SCG_DB = (
-    os.path.join(_REPO, "test", "dbs", "scg", "SCGs_40.fasta") if _TEST
-    else os.path.join(_REPO, "workflow", "resources", "SCGs_40_All.fasta")
+_DBS_DIR = os.path.join(_REPO, "dbs")
+
+_DB_AMR_KMA_DIR  = os.path.join(_DBS_DIR, "amrfinderplus_kma")
+_DB_AMR_DIR      = os.path.join(_DBS_DIR, "amrfinderplus")
+_DB_HUMAN_DIR    = os.path.join(_DBS_DIR, "human")
+_DB_MARKERS_DIR  = os.path.join(_DBS_DIR, "markers")
+_DB_SCG_DIR      = os.path.join(_DBS_DIR, "scg")
+_DB_GENOMAD_DIR  = os.path.join(_DBS_DIR, "genomad")
+_DB_UNIREF50_DIR = os.path.join(_DBS_DIR, "uniref50")
+_DB_CHECKM2_DIR  = os.path.join(_DBS_DIR, "checkm2")
+_DB_METABOLIC_DIR = os.path.join(_DBS_DIR, "metabolic")
+
+_LEGACY_SR_DBS_DIR     = os.path.join(_DBS_DIR, "short_reads")
+_LEGACY_GENOMAD_DB_DIR = os.path.join(_DBS_DIR, "genomad_db")
+_LEGACY_AFP_DB_DIR     = os.path.join(_DBS_DIR, "amrfinderplus_db")
+
+_SCG_SOURCE_FASTA = (
+    os.path.join(_REPO, "test", "dbs", "scg", "SCGs_40.fasta")
+    if _TEST else os.path.join(_REPO, "workflow", "resources", "SCGs_40_All.fasta")
 )
-_UNIREF50_DB   = os.path.join(_DBS_DIR, "uniref50", "uniref50_mmseqs")
-_AFP_DB_DIR    = os.path.join(_DBS_DIR, "amrfinderplus_db")
-_CHECKM2_DB    = os.path.join(_DBS_DIR, "checkm2", "CheckM2_database", "uniref100.KO.1.dmnd")
-_METABOLIC_DIR = os.path.join(_DBS_DIR, "METABOLIC")
+
+_SCG_DB = os.path.join(_DB_SCG_DIR, "scg_db")
+_UNIREF50_DB = os.path.join(_DB_UNIREF50_DIR, "uniref50_mmseqs")
+_AFP_DB_DIR = _DB_AMR_DIR
+_CHECKM2_DB = os.path.join(_DB_CHECKM2_DIR, "CheckM2_database", "uniref100.KO.1.dmnd")
+_METABOLIC_DIR = os.path.join(_DB_METABOLIC_DIR, "METABOLIC")
+
+# ---------------------------------------------------------------------------
+#   Output path helpers
+# ---------------------------------------------------------------------------
+
+FASTP_SUMMARY = os.path.join(output_dir, "fastp_summary.csv")
+SHORT_READS_OUTPUT = os.path.join(output_dir, "short_reads_output.csv")
+MARKERS_CPG_OUTPUT = os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv")
+ASSEMBLY_QA_OUTPUT = os.path.join(output_dir, "assembly_qa.tsv")
+CONTIG_SUMMARY_OUTPUT = os.path.join(output_dir, "contig_summary.tsv")
+AMR_ABUNDANCE_SUMMARY_OUTPUT = os.path.join(output_dir, "AMR_abundance_summary.csv")
+MAG_SUMMARY_OUTPUT = os.path.join(output_dir, "mag_summary.tsv")
+
+
+def sample_log(rule_name):
+    return os.path.join(output_dir, "logs", rule_name, "{sample}.log")
+
+
+def rule_log(rule_name):
+    return os.path.join(output_dir, "logs", f"{rule_name}.log")
 
 # ---------------------------------------------------------------------------
 #   Resource helper: returns test value when running in test mode
@@ -50,6 +85,10 @@ _METABOLIC_DIR = os.path.join(_DBS_DIR, "METABOLIC")
 def res(production, test=4000):
     """Return test-mode resource value when config test=True, else production."""
     return test if _TEST else production
+
+
+def attempt_value(values, attempt):
+    return values[min(attempt, len(values)) - 1]
 
 # ---------------------------------------------------------------------------
 #   Module flags — control which pipeline stages are active

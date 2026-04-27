@@ -38,10 +38,10 @@ def all_targets(wildcards):
     # --- Short-reads stage ---
     if _RUN_SR:
         targets += [
-            os.path.join(output_dir, "fastp_summary.csv"),
-            os.path.join(output_dir, "AMR_abundance_summary.csv"),
-            os.path.join(output_dir, "data", "QAQC", "short_reads_output.csv"),
-            os.path.join(output_dir, "data", "QAQC", "markers_cpg.csv"),
+            FASTP_SUMMARY,
+            SHORT_READS_OUTPUT,
+            AMR_ABUNDANCE_SUMMARY_OUTPUT,
+            MARKERS_CPG_OUTPUT,
         ]
 
     # --- Contig assembly + annotation stage ---
@@ -50,8 +50,8 @@ def all_targets(wildcards):
             *expand(os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"), sample=samples),
             *expand(os.path.join(output_dir, "data", "genomad", "{sample}"), sample=samples),
             *expand(os.path.join(output_dir, "data", "mobmess", "{sample}-mobmess_contigs.txt"), sample=samples),
-            os.path.join(output_dir, "contig_summary.tsv"),
-            os.path.join(output_dir, "assembly_qa.tsv"),
+            CONTIG_SUMMARY_OUTPUT,
+            ASSEMBLY_QA_OUTPUT,
         ]
 
     # --- MAG stage ---
@@ -77,7 +77,7 @@ def all_targets(wildcards):
                 os.path.join(output_dir, "data", "bins", "{sample}", "checkm2_quality.tsv"),
                 sample=samples
             )
-        targets += [os.path.join(output_dir, "mag_summary.tsv")]
+        targets += [MAG_SUMMARY_OUTPUT]
 
     return targets
 

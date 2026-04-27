@@ -7,12 +7,13 @@ Snakemake workflow for end-to-end metagenomic analysis of antibiotic resistance 
 SWAM-meta starts from paired-end FASTQs and generates:
 
 - **`fastp_summary.csv`** - per-sample read QC and Nonpareil coverage
+- **`short_reads_output.csv`** - per-gene short-read AMR abundances
 - **`assembly_qa.tsv`** - per-sample assembly size, N50, and read-mapping stats
 - **`contig_summary.tsv`** - per-contig abundance, taxonomy, AMR, MGE, and molecule type
 - **`AMR_abundance_summary.csv`** - per-sample AMR abundance plus additive and multiplicative risk scores
 - **`mag_summary.tsv`** - per-MAG abundance and annotations
 
-It also keeps lower-level outputs under `out_dir/data/`, including assemblies, geNomad results, MobMess output, MAG files, and the short-read tables `data/QAQC/short_reads_output.csv` and `data/QAQC/markers_cpg.csv`.
+It also keeps lower-level outputs under `out_dir/data/`, including assemblies, geNomad results, MobMess output, MAG files, and the marker support table `data/QAQC/markers_cpg.csv`.
 
 ---
 
@@ -76,6 +77,19 @@ To resume after a failed run:
 snakemake --use-conda --cores <N> --scheduler greedy --rerun-incomplete
 ```
 
+### Production mode on SLURM
+
+Edit the `default-resources.slurm_account` and `default-resources.slurm_partition` fields in `config/slurm/config.yaml`, then run:
+
+```bash
+bash run_swam-meta.sh /path/to/fastq_files /path/to/output
+```
+
+This uses the default resilient-style Slurm profile in `config/slurm/`, keeps incomplete outputs, retries failed jobs, and writes:
+
+- `{out_dir}/logs/run_status/run_report.txt`
+- `{out_dir}/logs/run_status/sample_rule_status.tsv`
+
 ---
 
 ## Databases
@@ -89,6 +103,21 @@ Most databases are downloaded and prepared automatically in `dbs/` on first use,
 - UniRef50 MMseqs2 taxonomy database
 - CheckM2 database
 - METABOLIC
+
+The repo-level `dbs/` directory is organized by tool or reference bundle:
+
+```text
+dbs/
+  amrfinderplus/       AMRFinderPlus protein database for contig/MAG annotation
+  amrfinderplus_kma/   KMA-formatted AMR CDS database for short reads
+  checkm2/             CheckM2 reference bundle
+  genomad/             geNomad database bundle
+  human/               host-filter reference genome
+  markers/             pBI143 / crAss001 FASTAs and KMA index
+  metabolic/           METABOLIC checkout
+  scg/                 DIAMOND SCG database
+  uniref50/            MMseqs2 UniRef50 taxonomy database
+```
 
 **GTDB-tk is the only manual setup step.**
 
@@ -117,21 +146,29 @@ Increase `genomad_splits` if geNomad needs less peak memory.
 
 ## Running on SLURM
 
-Two profiles are included:
+SWAM-meta ships with a single default Slurm profile in `config/slurm/config.yaml`.
 
-| Profile | Best for |
-|---|---|
-| `config/slurm/small-batch` | Fewer than 50 samples |
-| `config/slurm/large-batch` | 50 or more samples |
+Set:
 
-Set your account and partition in each profile, then run one of:
-
-```bash
-snakemake --profile config/slurm/small-batch
-snakemake --profile config/slurm/large-batch
+```yaml
+default-resources:
+  slurm_account: "your_account"
+  slurm_partition: "your_partition"
 ```
 
-The profiles already enable `use-conda` and the required greedy scheduler.
+Then either run through the wrapper:
+
+```bash
+bash run_swam-meta.sh /path/to/fastq_files /path/to/output
+```
+
+or call Snakemake directly:
+
+```bash
+snakemake --profile config/slurm/ --config in_dir=/path/to/fastq_files out_dir=/path/to/output
+```
+
+The profile already enables `use-conda`, the greedy scheduler, retries, `keep-going`, and grouped execution for lightweight sample-parallel rules.
 
 ---
 
@@ -168,11 +205,11 @@ If `run_short_reads: False`, contig abundance falls back to mean depth rather th
 | Path | Description |
 |---|---|
 | `{out_dir}/fastp_summary.csv` | Per-sample fastp metrics and Nonpareil coverage |
+| `{out_dir}/short_reads_output.csv` | Short-read AMR gene abundances |
 | `{out_dir}/assembly_qa.tsv` | Per-sample assembly QC metrics |
 | `{out_dir}/contig_summary.tsv` | Per-contig annotations and abundance |
 | `{out_dir}/AMR_abundance_summary.csv` | Per-sample AMR abundance and risk scores |
 | `{out_dir}/mag_summary.tsv` | Per-MAG summary table |
-| `{out_dir}/data/QAQC/short_reads_output.csv` | Short-read AMR gene abundances |
 | `{out_dir}/data/QAQC/markers_cpg.csv` | `pBI143` and `crAss001` copies per genome |
 
 `AMR_abundance_summary.csv` contains:

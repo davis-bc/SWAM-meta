@@ -2,21 +2,46 @@
 #       prepare geNomad database 
 # ------------------------------------------
 
+CONTIG_MEM_MB_BY_ATTEMPT = (150000, 180000, 220000)
+CONTIG_RUNTIME_BY_ATTEMPT = (4320, 5760, 7200)
+GENOMAD_MEM_MB_BY_ATTEMPT = (150000, 180000, 220000)
+GENOMAD_RUNTIME_BY_ATTEMPT = (4320, 5760, 7200)
+
+
+def contigs_mem_mb(_, attempt):
+    return res(attempt_value(CONTIG_MEM_MB_BY_ATTEMPT, attempt), 8000)
+
+
+def contigs_runtime(_, attempt):
+    return 240 if _TEST else attempt_value(CONTIG_RUNTIME_BY_ATTEMPT, attempt)
+
+
+def genomad_mem_mb(_, attempt):
+    return res(attempt_value(GENOMAD_MEM_MB_BY_ATTEMPT, attempt), 8000)
+
+
+def genomad_runtime(_, attempt):
+    return 240 if _TEST else attempt_value(GENOMAD_RUNTIME_BY_ATTEMPT, attempt)
+
 rule init_genomad:
     output:
-        genomad_db   = os.path.join(_DBS_DIR, "genomad_db", ".done")
+        genomad_db   = os.path.join(_DB_GENOMAD_DIR, ".done")
     params:
-        dbs_dir = _DBS_DIR
+        db_dir = _DB_GENOMAD_DIR,
+        legacy_dir = _LEGACY_GENOMAD_DB_DIR
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "init_genomad.log")
+        rule_log("init_genomad")
     conda: "../envs/genomad.yaml"
     shell:
         """
-        mkdir -p {params.dbs_dir}
-        if [ ! -d {params.dbs_dir}/genomad_db ]; then
+        mkdir -p "$(dirname {log})" "{params.db_dir}"
+        if [ -d "{params.legacy_dir}" ] && [ ! -d "{params.db_dir}/genomad_db" ]; then
+            mv -n "{params.legacy_dir}"/* "{params.db_dir}/" 2>/dev/null || true
+        fi
+        if [ ! -d "{params.db_dir}/genomad_db" ]; then
         
         echo "geNomad: downloading database..."
-        cd {params.dbs_dir}
+        cd {params.db_dir}
         curl -L --progress-bar https://zenodo.org/records/14886553/files/genomad_db_v1.9.tar.gz 2> >(tee -a {log} >&2) | tar -xz 2>> {log}
         touch {output.genomad_db}
         echo "geNomad: database ready"
@@ -40,16 +65,18 @@ rule contigs:
         megahit  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa")
     threads: lambda wc: res(32, 4)
     resources:
-        mem_mb  = lambda wc: res(150000, 8000),
+        mem_mb  = contigs_mem_mb,
+        runtime = contigs_runtime,
         threads = lambda wc: res(32, 4),
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.contigs.txt")
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.megahit.log")
+        sample_log("contigs")
     conda: "../envs/contigs.yaml"
     shell:
         """
         set -euo pipefail
+        mkdir -p "$(dirname {log})" "$(dirname {output.megahit})"
         echo "[{wildcards.sample}] MEGAHIT: assembling contigs..."
 
         # create temporary directory in same parent so moves are on same fs (atomic)
@@ -84,27 +111,30 @@ rule contigs:
 rule genomad:
     input:
         contigs      = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        genomad_db   = os.path.join(_DBS_DIR, "genomad_db", ".done")
+        genomad_db   = os.path.join(_DB_GENOMAD_DIR, ".done")
     output:
         genomad      = directory(os.path.join(output_dir, "data", "genomad", "{sample}")),
         plas_contigs = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid.fna"),
         plas_summary = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_plasmid_summary.tsv"),
         vir_summary  = os.path.join(output_dir, "data", "genomad", "{sample}", "{sample}.contigs_summary", "{sample}.contigs_virus_summary.tsv")
     params:
-        splits = config.get("genomad_splits", 1)
+        splits = config.get("genomad_splits", 1),
+        db_dir = os.path.join(_DB_GENOMAD_DIR, "genomad_db")
     threads: lambda wc: res(32, 4)
     resources:
-        mem_mb  = lambda wc: res(150000, 8000),
+        mem_mb  = genomad_mem_mb,
+        runtime = genomad_runtime,
         threads = lambda wc: res(32, 4),
     benchmark:
         os.path.join(output_dir, "data", "QAQC", "benchmarks", "{sample}.genomad.txt")
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.genomad.log")
+        sample_log("genomad")
     conda: "../envs/genomad.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         echo "[{wildcards.sample}] geNomad: classifying contigs (chromosome/plasmid/phage)..."
-        genomad end-to-end {input.contigs} {output.genomad} $(dirname {input.genomad_db}) \
+        genomad end-to-end {input.contigs} {output.genomad} {params.db_dir} \
             --relaxed --cleanup --splits {params.splits} >> {log} 2>&1
         # touch missing output files (geNomad omits them when no hits are found)
         touch {output.plas_contigs} {output.plas_summary} {output.vir_summary}
@@ -130,9 +160,10 @@ rule mobmess:
         mem_mb  = lambda wc: res(150000, 8000),
         threads = lambda wc: res(32, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mobmess.log")
+        sample_log("mobmess")
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p $(dirname {output.contig_bam})
         # Skip processing if plasmid FASTA is empty (no plasmids found by geNomad)
         if [ ! -s {input.plas_contigs} ]; then
@@ -163,11 +194,11 @@ rule mobmess:
 
 rule init_mmseqs_db:
     output:
-        done = os.path.join(_DBS_DIR, "uniref50", ".done")
+        done = os.path.join(_DB_UNIREF50_DIR, ".done")
     params:
         test_mode    = _TEST,
         db_prefix    = _UNIREF50_DB,
-        dbs_dir      = _DBS_DIR,
+        dbs_dir      = _DB_UNIREF50_DIR,
         test_fasta   = os.path.join(_REPO, "test", "dbs", "uniref50", "uniref50_mini.fasta"),
         test_tax_dir = os.path.join(_REPO, "test", "dbs", "uniref50"),
         test_mapping = os.path.join(_REPO, "test", "dbs", "uniref50", "tax_mapping.tsv"),
@@ -177,9 +208,10 @@ rule init_mmseqs_db:
         threads = lambda wc: res(16, 4),
     conda: "../envs/contigs.yaml"
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "init_mmseqs_db.log")
+        rule_log("init_mmseqs_db")
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p "$(dirname {params.db_prefix})"
 
         if [ "{params.test_mode}" = "True" ]; then
@@ -195,9 +227,9 @@ rule init_mmseqs_db:
             echo "MMseqs2: test database ready"
         else
             if [ ! -f "{params.db_prefix}.dbtype" ]; then
-                UNIREF_FASTA="{params.dbs_dir}/uniref50/uniref50.fasta"
-                TAX_DIR="{params.dbs_dir}/uniref50/taxdump"
-                TMP_DIR="{params.dbs_dir}/uniref50/tmp"
+                UNIREF_FASTA="{params.dbs_dir}/uniref50.fasta"
+                TAX_DIR="{params.dbs_dir}/taxdump"
+                TMP_DIR="{params.dbs_dir}/tmp"
                 mkdir -p "$TAX_DIR" "$TMP_DIR"
 
                 echo "MMseqs2: downloading UniRef50 FASTA (~9 GB)..."
@@ -244,10 +276,11 @@ rule prodigal:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = 1,
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.prodigal.log")
+        sample_log("prodigal")
     conda: "../envs/contigs.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p $(dirname {output.faa})
         echo "[{wildcards.sample}] Prodigal: predicting genes..."
         prodigal -i {input.contigs} -a {output.faa} -f gff -o {output.gff} -p meta -q >> {log} 2>&1
@@ -259,18 +292,23 @@ rule prodigal:
 # ---------------------------------------------------------------------------
 
 rule init_amrfinder_db:
-    """Download the AMRFinderPlus database to dbs/amrfinderplus_db/. Skipped in test mode."""
+    """Download the AMRFinderPlus database to dbs/amrfinderplus/. Skipped in test mode."""
     output:
         done = os.path.join(_AFP_DB_DIR, ".done")
     params:
-        db_dir    = _AFP_DB_DIR,
-        test_mode = _TEST
+        db_dir      = _AFP_DB_DIR,
+        legacy_dir  = _LEGACY_AFP_DB_DIR,
+        test_mode   = _TEST
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "init_amrfinder_db.log")
+        rule_log("init_amrfinder_db")
     conda: "../envs/mags.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p {params.db_dir}
+        if [ -d "{params.legacy_dir}" ] && [ ! -f "{params.db_dir}/AMR_CDS.fa" ]; then
+            mv -n "{params.legacy_dir}"/* "{params.db_dir}/" 2>/dev/null || true
+        fi
         if [ "{params.test_mode}" = "True" ]; then
             echo "init_amrfinder_db: test mode — skipping database download"
         elif [ -f "{params.db_dir}/AMR_CDS.fa" ]; then
@@ -310,10 +348,11 @@ rule contig_amr:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.contig_amr.log")
+        sample_log("contig_amr")
     conda: "../envs/mags.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p $(dirname {output.tsv})
         echo "[{wildcards.sample}] AMRFinderPlus: annotating contigs..."
         amrfinder \
@@ -339,10 +378,11 @@ rule init_mge_tool:
     output:
         done = os.path.join(output_dir, "data", "mge_contigs", ".mef_install.done")
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "init_mge_tool.log")
+        rule_log("init_mge_tool")
     conda: "../envs/contigs.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p $(dirname {output.done})
         echo "MobileElementFinder: installing..."
         pip install --no-deps --quiet mypy-extensions >> {log} 2>&1
@@ -364,10 +404,11 @@ rule mge_annotation:
         mem_mb  = lambda wc: res(16000, 4000),
         threads = lambda wc: res(16, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mge_annotation.log")
+        sample_log("mge_annotation")
     conda: "../envs/contigs.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p {output.tmp}
         CHUNK_DIR={output.tmp}/chunks
         mkdir -p "$CHUNK_DIR"
@@ -423,7 +464,7 @@ rule mge_annotation:
 rule mmseqs_taxonomy:
     input:
         contigs  = os.path.join(output_dir, "data", "megahit", "{sample}.contigs.fa"),
-        db_done  = os.path.join(_DBS_DIR, "uniref50", ".done")
+        db_done  = os.path.join(_DB_UNIREF50_DIR, ".done")
     output:
         lca = os.path.join(output_dir, "data", "mmseqs", "{sample}_lca.tsv")
     params:
@@ -434,10 +475,11 @@ rule mmseqs_taxonomy:
         mem_mb  = lambda wc: res(64000, 4000),
         threads = lambda wc: res(32, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.mmseqs_taxonomy.log")
+        sample_log("mmseqs_taxonomy")
     conda: "../envs/contigs.yaml"
     shell:
         """
+        mkdir -p "$(dirname {log})"
         mkdir -p $(dirname {output.lca}) {params.tmp}
         echo "[{wildcards.sample}] MMseqs2: taxonomy classification..."
         mmseqs easy-taxonomy \
@@ -476,11 +518,12 @@ rule contig_abundance:
         mem_mb  = lambda wc: res(20000, 4000),
         threads = lambda wc: res(16, 4),
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.contig_abundance.log")
+        sample_log("contig_abundance")
     conda: "../envs/shortreads.yaml"
     shell:
         """
         set -euo pipefail
+        mkdir -p "$(dirname {log})"
         mkdir -p $(dirname {output.bam})
 
         echo "[{wildcards.sample}] minimap2: mapping reads to contigs..."
@@ -514,13 +557,13 @@ rule contig_summary:
         mge_files      = expand(os.path.join(output_dir, "data", "mge_contigs", "{sample}_mge.tsv"), sample=samples),
         prodigal_gffs  = expand(os.path.join(output_dir, "data", "prodigal", "{sample}.gff"), sample=samples)
     output:
-        tsv = os.path.join(output_dir, "contig_summary.tsv")
+        tsv = CONTIG_SUMMARY_OUTPUT
     params:
         samples    = samples,
         output_dir = output_dir
     conda: "../envs/contigs.yaml"
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "contig_summary.log")
+        rule_log("contig_summary")
     script:
         "../scripts/contig_summary.py"
 
@@ -533,15 +576,15 @@ rule assembly_qa:
     """Per-sample assembly QA: N50, total length, read mapping stats."""
     input:
         bam_files    = expand(os.path.join(output_dir, "data", "contig_abundance", "{sample}_contigs.bam"), sample=samples),
-        megahit_logs = expand(os.path.join(output_dir, "data", "QAQC", "logs", "{sample}.megahit.log"), sample=samples)
+        megahit_logs = expand(sample_log("contigs"), sample=samples)
     output:
-        tsv = os.path.join(output_dir, "assembly_qa.tsv")
+        tsv = ASSEMBLY_QA_OUTPUT
     params:
         samples    = samples,
         output_dir = output_dir
     conda: "../envs/contigs.yaml"
     log:
-        os.path.join(output_dir, "data", "QAQC", "logs", "assembly_qa.log")
+        rule_log("assembly_qa")
     script:
         "../scripts/assembly_qa.py"
         
